@@ -1,13 +1,17 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "datahomegh/datahomegh",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "DataHomeGH — Ghana data bundle reseller platform (Laravel + Hostinger).",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "devrabiul/laravel-paystack": "^1.0",
+        "intervention/image": "^3.7",
+        "kreait/laravel-firebase": "^6.2",
         "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
