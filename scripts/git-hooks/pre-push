@@ -1,0 +1,27 @@
+#!/bin/sh
+# DataHomeGH — pre-push safety hook
+# Runs automatically before every 'git push'
+# Install: cp scripts/git-hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Block direct push to main or develop
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then
+  echo "ERROR: Direct push to $BRANCH is not allowed."
+  echo "Create a feature branch and open a Pull Request instead."
+  echo "  git checkout -b feature/your-feature-name"
+  exit 1
+fi
+
+# Run Laravel tests before pushing
+echo "Running tests before push..."
+php artisan test --stop-on-failure
+TEST_RESULT=$?
+
+if [ $TEST_RESULT -ne 0 ]; then
+  echo "PUSH ABORTED: Tests failed. Fix errors before pushing."
+  exit 1
+fi
+
+echo "All checks passed. Pushing to GitHub..."
+exit 0

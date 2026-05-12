@@ -1,0 +1,73 @@
+name: DataHomeGH CI
+
+on:
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+      - 'chore/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: datahomegh_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring, openssl, gd, zip
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Copy .env
+        run: cp .env.example .env
+
+      - name: Set environment for CI
+        run: |
+          sed -i -e 's/^APP_ENV=.*/APP_ENV=testing/' \
+                 -e 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' \
+                 -e 's/^# DB_HOST=.*/DB_HOST=127.0.0.1/' \
+                 -e 's/^# DB_PORT=.*/DB_PORT=3306/' \
+                 -e 's/^# DB_DATABASE=.*/DB_DATABASE=datahomegh_test/' \
+                 -e 's/^# DB_USERNAME=.*/DB_USERNAME=root/' \
+                 -e 's/^# DB_PASSWORD=.*/DB_PASSWORD=secret/' \
+                 -e 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' \
+                 -e 's/^CACHE_STORE=.*/CACHE_STORE=array/' \
+                 -e 's/^SESSION_DRIVER=.*/SESSION_DRIVER=array/' \
+                 .env
+
+      - name: Generate app key
+        run: php artisan key:generate
+
+      - name: Run migrations
+        run: php artisan migrate --force
+
+      - name: Run seeders
+        run: php artisan db:seed --force
+
+      - name: Run tests
+        run: php artisan test --stop-on-failure
