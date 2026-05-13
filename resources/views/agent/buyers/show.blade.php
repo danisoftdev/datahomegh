@@ -1,0 +1,61 @@
+@extends('layouts.agent')
+
+@section('title', $buyer->username . ' — ' . __('My buyers'))
+@section('heading', $buyer->username)
+
+@section('content')
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+        <a href="{{ route('agent.buyers.index') }}" class="text-sm text-emerald-400 hover:underline">← {{ __('My buyers') }}</a>
+    </div>
+
+    <div class="rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
+        <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Buyer') }}</h2>
+        <dl class="grid gap-2 text-sm sm:grid-cols-2">
+            <div><dt class="text-slate-500">{{ __('Name') }}</dt><dd>{{ $buyer->name }}</dd></div>
+            <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $buyer->phone }}</dd></div>
+            <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd>{{ $buyer->status }}</dd></div>
+            <div><dt class="text-slate-500">{{ __('Wallet') }}</dt><dd>{{ $buyer->wallet ? number_format((float) $buyer->wallet->balance, 2).' GHS' : '—' }}</dd></div>
+        </dl>
+
+        <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
+            @if ($buyer->status === 'pending')
+                <form method="post" action="{{ route('agent.buyers.approve', $buyer) }}">
+                    @csrf
+                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Approve') }}</button>
+                </form>
+            @endif
+            <form method="post" action="{{ route('agent.buyers.destroy', $buyer) }}" onsubmit="return confirm(@json(__('Remove this buyer from your shop? They will keep their account but no longer be linked to you.')))">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="rounded-lg bg-red-600/80 px-4 py-2 text-sm text-white hover:bg-red-600">{{ __('Remove from shop') }}</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="mt-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
+        <h3 class="mb-4 font-semibold text-white">{{ __('Order history') }}</h3>
+        {{ $orders->links() }}
+        <table class="mt-2 w-full text-left text-sm text-slate-300">
+            <thead class="text-xs uppercase text-slate-500">
+                <tr>
+                    <th class="py-2">#</th>
+                    <th class="py-2">{{ __('When') }}</th>
+                    <th class="py-2">{{ __('Status') }}</th>
+                    <th class="py-2">{{ __('Amount') }}</th>
+                    <th class="py-2"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($orders as $o)
+                    <tr class="border-t border-white/5">
+                        <td class="py-2">{{ $o->id }}</td>
+                        <td class="py-2 whitespace-nowrap">{{ $o->created_at?->format('Y-m-d H:i') }}</td>
+                        <td class="py-2">{{ $o->status }}</td>
+                        <td class="py-2">{{ number_format((float) $o->amount, 2) }}</td>
+                        <td class="py-2"><a href="{{ route('agent.orders.show', $o) }}" class="text-emerald-400 hover:underline">{{ __('View') }}</a></td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+@endsection

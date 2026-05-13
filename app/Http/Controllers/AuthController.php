@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Notification;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +16,10 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {}
+
     public function showRegisterForm(?string $agentSlug = null): View
     {
         $agent = null;
@@ -183,31 +187,15 @@ class AuthController extends Controller
     {
         $title = 'New buyer registration';
         $message = "{$buyer->name} (@{$buyer->username}) registered and is awaiting approval.";
-        $now = now();
-
         User::query()
             ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
             ->cursor()
-            ->each(function (User $supplier) use ($title, $message, $now): void {
-                Notification::query()->create([
-                    'user_id' => $supplier->id,
-                    'title' => $title,
-                    'message' => $message,
-                    'type' => 'buyer_registered',
-                    'is_read' => false,
-                    'created_at' => $now,
-                ]);
+            ->each(function (User $supplier) use ($title, $message): void {
+                $this->notificationService->notify($supplier->id, $title, $message, 'buyer_registered');
             });
 
         if ($agent !== null) {
-            Notification::query()->create([
-                'user_id' => $agent->id,
-                'title' => $title,
-                'message' => $message,
-                'type' => 'buyer_registered',
-                'is_read' => false,
-                'created_at' => $now,
-            ]);
+            $this->notificationService->notify($agent->id, $title, $message, 'buyer_registered');
         }
     }
 }
