@@ -16,6 +16,10 @@ class WalletNotFrozenMiddleware
 
         $user = $request->user()->loadMissing('wallet');
 
+        if ($user->trashed()) {
+            return $this->denyWallet($request, 'Your account cannot perform this action.');
+        }
+
         if (in_array($user->status, ['held', 'deleted'], true)) {
             return $this->denyWallet($request, 'Your account cannot perform this action.');
         }

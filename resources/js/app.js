@@ -30,11 +30,17 @@ document.addEventListener('alpine:init', () => {
         recent: [],
         loading: false,
         alertModal: null,
-        pollHandle: null,
+        alertPoll: null,
 
         init() {
-            this.refreshUnread();
-            this.pollHandle = setInterval(() => this.refreshUnread(), config.pollMs ?? 30000);
+            this.refreshUnreadOnly();
+            this.loadRecent();
+            this.pollHandle = setInterval(() => {
+                this.refreshUnreadOnly();
+            }, config.pollMs ?? 30000);
+            this.alertPoll = setInterval(() => {
+                this.loadRecent();
+            }, config.pollMs ?? 30000);
             this.$watch('open', (v) => {
                 if (v) {
                     this.loadRecent();
@@ -46,17 +52,15 @@ document.addEventListener('alpine:init', () => {
             if (this.pollHandle) {
                 clearInterval(this.pollHandle);
             }
+            if (this.alertPoll) {
+                clearInterval(this.alertPoll);
+            }
         },
 
-        async refreshUnread() {
+        async refreshUnreadOnly() {
             try {
-                const [u, rec] = await Promise.all([
-                    fetch(config.unreadUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then((r) => r.json()),
-                    fetch(config.recentUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then((r) => r.json()),
-                ]);
+                const u = await fetch(config.unreadUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then((r) => r.json());
                 this.unread = u.count ?? 0;
-                this.recent = rec.data ?? [];
-                this.evaluateAlertModal();
             } catch {
                 /* ignore */
             }

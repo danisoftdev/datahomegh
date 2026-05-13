@@ -20,11 +20,15 @@ class AuthController extends Controller
         private readonly NotificationService $notificationService,
     ) {}
 
-    public function showRegisterForm(?string $agentSlug = null): View
+    public function showRegisterForm(Request $request, ?string $agentSlug = null): View
     {
+        $agentSlug = $agentSlug !== null && $agentSlug !== ''
+            ? $agentSlug
+            : (string) $request->query('agent', '');
+
         $agent = null;
 
-        if ($agentSlug !== null && $agentSlug !== '') {
+        if ($agentSlug !== '') {
             $agent = User::query()
                 ->where('shop_slug', $agentSlug)
                 ->where('status', 'active')
