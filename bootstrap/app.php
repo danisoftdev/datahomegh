@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\AgentOrSupplierMiddleware;
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SupplierMiddleware;
+use App\Http\Middleware\WalletNotFrozenMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,12 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
-            'supplier' => \App\Http\Middleware\SupplierMiddleware::class,
-            'wallet' => \App\Http\Middleware\WalletNotFrozenMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'supplier' => SupplierMiddleware::class,
+            'wallet' => WalletNotFrozenMiddleware::class,
+            'agent_or_supplier' => AgentOrSupplierMiddleware::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
+
+        $middleware->validateCsrfTokens(except: [
+            'wallet/paystack/webhook',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -27,10 +27,13 @@
                 @enderror
             </div>
 
-            <div class="flex items-center gap-2">
-                <input id="remember" name="remember" type="checkbox" value="1" {{ old('remember') ? 'checked' : '' }}
-                    class="size-4 rounded border-white/20 bg-[#1A1A2E] text-[#FFD700] focus:ring-[#FFD700]/30" />
-                <label for="remember" class="text-sm text-slate-300">{{ __('Remember me') }}</label>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <input id="remember" name="remember" type="checkbox" value="1" {{ old('remember') ? 'checked' : '' }}
+                        class="size-4 rounded border-white/20 bg-[#1A1A2E] text-[#FFD700] focus:ring-[#FFD700]/30" />
+                    <label for="remember" class="text-sm text-slate-300">{{ __('Remember me') }}</label>
+                </div>
+                <a href="{{ route('password.request') }}" class="text-sm font-medium text-[#FFD700] hover:underline">{{ __('Forgot password?') }}</a>
             </div>
 
             <button type="submit"

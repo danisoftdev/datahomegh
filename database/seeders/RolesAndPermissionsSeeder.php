@@ -84,4 +84,4 @@ class RolesAndPermissionsSeeder extends Seeder
         $buyerIds = $permissionModels->whereIn('slug', self::BUYER_PERMISSION_SLUGS)->pluck('id')->all();
         $buyer->permissions()->sync($buyerIds);
     }
-};
+}

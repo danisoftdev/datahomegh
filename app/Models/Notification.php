@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Notification extends Model
 {
@@ -12,6 +13,8 @@ class Notification extends Model
 
     protected $fillable = [
         'user_id',
+        'broadcast_group_id',
+        'broadcast_role_slugs',
         'title',
         'message',
         'type',
@@ -24,6 +27,7 @@ class Notification extends Model
         return [
             'is_read' => 'boolean',
             'created_at' => 'datetime',
+            'broadcast_role_slugs' => 'array',
         ];
     }
 
@@ -32,11 +36,74 @@ class Notification extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function scopeForUser(Builder $query, int $userId): Builder
+    public function reads(): HasMany
     {
-        return $query->where(function (Builder $q) use ($userId) {
-            $q->whereNull('user_id')
-                ->orWhere('user_id', $userId);
+        return $this->hasMany(NotificationRead::class);
+    }
+
+    /**
+     * In-app notifications visible to the user: their own rows plus broadcast rows
+     * (user_id null) that are not superseded by a per-user copy in the same broadcast group.
+     *
+     * @param  non-empty-string|null  $roleSlug  Authenticated user's role slug (for targeted broadcasts).
+     */
+    public function scopeForUser(Builder $query, int $userId, ?string $roleSlug = null): Builder
+    {
+        return $query->where(function (Builder $q) use ($userId, $roleSlug) {
+            $q->where('user_id', $userId)
+                ->orWhere(function (Builder $q2) use ($userId, $roleSlug) {
+                    $q2->whereNull('user_id')
+                        ->where(function (Builder $qRole) use ($roleSlug) {
+                            $qRole->whereNull('broadcast_role_slugs');
+                            if ($roleSlug !== null && $roleSlug !== '') {
+                                $qRole->orWhereJsonContains('broadcast_role_slugs', $roleSlug);
+                            }
+                        })
+                        ->where(function (Builder $q3) use ($userId) {
+                            $q3->whereNull('broadcast_group_id')
+                                ->orWhereNotExists(function ($sub) use ($userId) {
+                                    $sub->selectRaw('1')
+                                        ->from('notifications as nb')
+                                        ->whereColumn('nb.broadcast_group_id', 'notifications.broadcast_group_id')
+                                        ->where('nb.user_id', $userId)
+                                        ->whereNotNull('notifications.broadcast_group_id');
+                                });
+                        });
+                });
         });
+    }
+
+    public function scopeVisibleBroadcastsFor(Builder $query, int $userId, ?string $roleSlug = null): Builder
+    {
+        return $query->whereNull('user_id')
+            ->where(function (Builder $qRole) use ($roleSlug) {
+                $qRole->whereNull('broadcast_role_slugs');
+                if ($roleSlug !== null && $roleSlug !== '') {
+                    $qRole->orWhereJsonContains('broadcast_role_slugs', $roleSlug);
+                }
+            })
+            ->where(function (Builder $q) use ($userId) {
+                $q->whereNull('broadcast_group_id')
+                    ->orWhereNotExists(function ($sub) use ($userId) {
+                        $sub->selectRaw('1')
+                            ->from('notifications as nb')
+                            ->whereColumn('nb.broadcast_group_id', 'notifications.broadcast_group_id')
+                            ->where('nb.user_id', $userId)
+                            ->whereNotNull('notifications.broadcast_group_id');
+                    });
+            });
+    }
+
+    public function isUnreadForUser(int $userId): bool
+    {
+        if ($this->user_id === $userId) {
+            return ! $this->is_read;
+        }
+
+        if ($this->user_id === null) {
+            return ! $this->reads()->where('user_id', $userId)->exists();
+        }
+
+        return false;
     }
 }

@@ -1,0 +1,98 @@
+@props(['variant' => 'default'])
+
+@php
+    $ring = match ($variant) {
+        'emerald' => 'ring-emerald-500/30 focus:ring-emerald-500/50',
+        'gold' => 'ring-[#FFD700]/40 focus:ring-[#FFD700]/60',
+        default => 'ring-white/10 focus:ring-white/20',
+    };
+    $badge = match ($variant) {
+        'emerald' => 'bg-emerald-500 text-white',
+        'gold' => 'bg-[#FFD700] text-[#1A1A2E]',
+        default => 'bg-rose-500 text-white',
+    };
+@endphp
+
+<div
+    class="relative shrink-0"
+    x-data="notificationBell(@json([
+        'unreadUrl' => route('notifications.unread-count'),
+        'recentUrl' => route('notifications.recent'),
+        'markReadUrl' => route('notifications.mark-read'),
+        'pollMs' => 30000,
+    ]))"
+>
+    <button
+        type="button"
+        @click="open = !open"
+        class="relative rounded-lg p-2 text-slate-300 hover:bg-white/10 focus:outline-none focus:ring-2 {{ $ring }}"
+        aria-label="{{ __('Notifications') }}"
+    >
+        <svg class="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span
+            x-show="unread > 0"
+            x-cloak
+            class="absolute -right-0.5 -top-0.5 flex min-h-4.5 min-w-4.5 items-center justify-center rounded-full px-1 text-[10px] font-bold {{ $badge }}"
+            x-text="unread > 99 ? '99+' : unread"
+        ></span>
+    </button>
+
+    <div
+        x-show="open"
+        x-cloak
+        x-transition
+        class="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#1A1A2E] shadow-xl"
+        style="display: none;"
+    >
+        <div class="flex items-center justify-between border-b border-white/10 px-3 py-2">
+            <span class="text-sm font-semibold text-white">{{ __('Notifications') }}</span>
+            <button type="button" @click="markAllRead()" class="text-xs font-medium text-[#FFD700] hover:underline">
+                {{ __('Mark all read') }}
+            </button>
+        </div>
+        <div class="max-h-72 overflow-y-auto">
+            <p x-show="loading" x-cloak class="px-3 py-4 text-sm text-slate-500" style="display: none;">{{ __('Loading…') }}</p>
+            <p x-show="!loading && recent.length === 0" x-cloak class="px-3 py-4 text-sm text-slate-500" style="display: none;">{{ __('No notifications yet.') }}</p>
+            <template x-for="n in recent" :key="n.id">
+                <div class="border-b border-white/5 px-3 py-2 last:border-b-0">
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="font-medium text-white" x-text="n.title"></span>
+                        <span class="shrink-0 text-xs text-slate-500" x-text="timeAgo(n.created_at)"></span>
+                    </div>
+                    <p class="mt-0.5 line-clamp-2 text-sm text-slate-400" x-text="n.message"></p>
+                </div>
+            </template>
+        </div>
+        <a
+            href="{{ route('notifications.index') }}"
+            class="block border-t border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-[#FFD700] hover:bg-white/10"
+        >
+            {{ __('View all') }}
+        </a>
+    </div>
+
+    <div
+        x-show="alertModal"
+        x-cloak
+        class="fixed inset-0 z-100 flex items-center justify-center bg-black/75 p-4"
+        style="display: none;"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="max-w-lg rounded-xl border border-red-500/40 bg-[#1A1A2E] p-6 shadow-2xl">
+            <p class="text-xs font-semibold uppercase tracking-wide text-red-400">{{ __('Alert') }}</p>
+            <h3 class="mt-2 text-lg font-bold text-white" x-text="alertModal?.title"></h3>
+            <p class="mt-3 text-slate-300" x-text="alertModal?.message"></p>
+            <div class="mt-6 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="dismissAlert()" class="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-300 hover:bg-white/5">
+                    {{ __('Dismiss') }}
+                </button>
+                <button type="button" @click="markAllRead()" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E]">
+                    {{ __('Mark read') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

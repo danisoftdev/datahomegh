@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\RoleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -15,7 +16,7 @@ class Role extends Model
 
     public const SLUG_BUYER = 'buyer';
 
-    /** @use HasFactory<\Database\Factories\RoleFactory> */
+    /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
     protected $fillable = [
