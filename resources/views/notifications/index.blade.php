@@ -1,12 +1,18 @@
 @extends($layout)
 
-@section('title', __('Notifications'))
+@if ($layout === 'layouts.app')
+    @section('nav_variant')
+        {{ auth()->user()->role?->slug === \App\Models\Role::SLUG_AGENT ? 'agent' : 'buyer' }}
+    @endsection
+@endif
+
+@section('title', __('Notifications') . ' — ' . config('app.name'))
 @section('heading', __('Notifications'))
 
 @section('content')
     <h1 class="mb-6 text-2xl font-bold text-white">{{ __('Notifications') }}</h1>
 
-    <div class="overflow-x-auto rounded-xl border border-white/10 bg-[#16213E]/80">
+    <div class="overflow-x-auto rounded-xl border border-white/10 bg-navy/80">
         <table class="w-full text-left text-sm text-slate-300">
             <thead class="border-b border-white/10 text-xs uppercase text-slate-500">
                 <tr>

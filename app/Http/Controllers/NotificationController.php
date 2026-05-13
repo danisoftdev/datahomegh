@@ -109,7 +109,7 @@ class NotificationController extends Controller
     {
         return match ($user->role?->slug) {
             Role::SLUG_SUPPLIER => 'layouts.admin',
-            Role::SLUG_AGENT => 'layouts.agent',
+            Role::SLUG_AGENT => 'layouts.app',
             default => 'layouts.buyer',
         };
     }

@@ -21,6 +21,7 @@ use App\Http\Controllers\FirebaseWebConfigController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\WalletController;
 use App\Models\Role;
 use Illuminate\Support\Facades\Route;
@@ -152,7 +153,11 @@ Route::middleware('auth')->group(function (): void {
         Route::post('wallet/debit', [WalletController::class, 'adminDebit'])->name('wallet.debit');
 
         Route::get('roles', [AdminRoleController::class, 'index'])->name('roles.index');
-        Route::patch('roles/{role}', [AdminRoleController::class, 'update'])->name('roles.update');
+        Route::get('roles/create', [AdminRoleController::class, 'create'])->name('roles.create');
+        Route::post('roles', [AdminRoleController::class, 'store'])->name('roles.store');
+        Route::get('roles/{role}/edit', [AdminRoleController::class, 'edit'])->name('roles.edit');
+        Route::put('roles/{role}', [AdminRoleController::class, 'update'])->name('roles.update');
+        Route::post('roles/{role}/toggle', [AdminRoleController::class, 'toggle'])->name('roles.toggle');
 
         Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
     });
@@ -177,3 +182,7 @@ Route::middleware('auth')->group(function (): void {
         };
     })->name('dashboard');
 });
+
+Route::get('/{agentSlug}', [ShopController::class, 'show'])
+    ->where('agentSlug', '[A-Za-z0-9][A-Za-z0-9\-]*')
+    ->name('shop.show');

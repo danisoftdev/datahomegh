@@ -98,6 +98,11 @@ class User extends Authenticatable
         return $this->hasMany(BundlePackage::class, 'agent_id');
     }
 
+    public function resalePlans(): HasMany
+    {
+        return $this->hasMany(ResalePlan::class, 'agent_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');

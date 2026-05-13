@@ -3,12 +3,12 @@
 @php
     $ring = match ($variant) {
         'emerald' => 'ring-emerald-500/30 focus:ring-emerald-500/50',
-        'gold' => 'ring-[#FFD700]/40 focus:ring-[#FFD700]/60',
+        'gold' => 'ring-primary/40 focus:ring-primary/60',
         default => 'ring-white/10 focus:ring-white/20',
     };
     $badge = match ($variant) {
         'emerald' => 'bg-emerald-500 text-white',
-        'gold' => 'bg-[#FFD700] text-[#1A1A2E]',
+        'gold' => 'bg-primary text-dark',
         default => 'bg-rose-500 text-white',
     };
 @endphp
@@ -21,10 +21,11 @@
         'markReadUrl' => route('notifications.mark-read'),
         'pollMs' => 30000,
     ]))"
+    @click.outside="open = false"
 >
     <button
         type="button"
-        @click="open = !open"
+        @click.stop="open = !open"
         class="relative rounded-lg p-2 text-slate-300 hover:bg-white/10 focus:outline-none focus:ring-2 {{ $ring }}"
         aria-label="{{ __('Notifications') }}"
     >
@@ -43,12 +44,13 @@
         x-show="open"
         x-cloak
         x-transition
-        class="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#1A1A2E] shadow-xl"
+        @click.stop
+        class="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/10 bg-navy shadow-xl"
         style="display: none;"
     >
         <div class="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <span class="text-sm font-semibold text-white">{{ __('Notifications') }}</span>
-            <button type="button" @click="markAllRead()" class="text-xs font-medium text-[#FFD700] hover:underline">
+            <button type="button" @click="markAllRead()" class="text-xs font-medium text-primary hover:underline">
                 {{ __('Mark all read') }}
             </button>
         </div>
@@ -67,7 +69,7 @@
         </div>
         <a
             href="{{ route('notifications.index') }}"
-            class="block border-t border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-[#FFD700] hover:bg-white/10"
+            class="block border-t border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-primary hover:bg-white/10"
         >
             {{ __('View all') }}
         </a>
@@ -76,12 +78,13 @@
     <div
         x-show="alertModal"
         x-cloak
-        class="fixed inset-0 z-100 flex items-center justify-center bg-black/75 p-4"
+        class="fixed inset-0 z-200 flex flex-col items-center justify-center bg-black/85 p-4 sm:p-8"
         style="display: none;"
         role="dialog"
         aria-modal="true"
+        @click.self="dismissAlert()"
     >
-        <div class="max-w-lg rounded-xl border border-red-500/40 bg-[#1A1A2E] p-6 shadow-2xl">
+        <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-red-500/40 bg-dark p-6 shadow-2xl" @click.stop>
             <p class="text-xs font-semibold uppercase tracking-wide text-red-400">{{ __('Alert') }}</p>
             <h3 class="mt-2 text-lg font-bold text-white" x-text="alertModal?.title"></h3>
             <p class="mt-3 text-slate-300" x-text="alertModal?.message"></p>
@@ -89,7 +92,7 @@
                 <button type="button" @click="dismissAlert()" class="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-300 hover:bg-white/5">
                     {{ __('Dismiss') }}
                 </button>
-                <button type="button" @click="markAllRead()" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E]">
+                <button type="button" @click="markAllRead()" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-dark">
                     {{ __('Mark read') }}
                 </button>
             </div>
