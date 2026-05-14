@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PaystackTransaction;
 use App\Models\User;
 use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
@@ -41,7 +42,7 @@ class AgentRegistrationFeeController extends Controller
             ]);
         }
 
-        if (($data['status'] ?? '') !== 'success') {
+        if (strtolower((string) ($data['status'] ?? '')) !== 'success') {
             return redirect()->route('login')->withErrors([
                 'username' => __('Payment was not completed. Your agent application was not submitted for approval. You can try registering again or contact support.'),
             ]);
@@ -49,16 +50,26 @@ class AgentRegistrationFeeController extends Controller
 
         $meta = PaystackChargeMetadata::fromChargeData($data);
         $userId = (int) ($meta['user_id'] ?? 0);
+        $type = $meta['type'];
 
-        if ($userId <= 0 || $meta['type'] !== 'agent_shop_registration') {
+        $txn = PaystackTransaction::query()->where('reference', $reference)->first();
+        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
+            $userId = (int) $txn->user_id;
+            $type = 'agent_shop_registration';
+        }
+
+        if ($userId <= 0 || $type !== 'agent_shop_registration') {
             return redirect()->route('login')->withErrors([
                 'username' => __('This payment could not be linked to an agent registration.'),
             ]);
         }
 
         if ($sessionRef !== '' && ($sessionRef !== $reference || $sessionUid !== $userId)) {
-            return redirect()->route('login')->withErrors([
-                'username' => __('This payment session is invalid or expired. If you were charged, contact support with your Paystack reference: :ref.', ['ref' => $reference]),
+            Log::warning('agent_registration_fee_callback_session_mismatch', [
+                'reference' => $reference,
+                'session_reference' => $sessionRef,
+                'session_user_id' => $sessionUid,
+                'resolved_user_id' => $userId,
             ]);
         }
 

@@ -145,6 +145,67 @@ class AuthTest extends TestCase
             ->count());
     }
 
+    public function test_agent_register_callback_succeeds_using_transaction_when_paystack_metadata_is_empty_and_session_mismatches(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_meta_gap',
+                ],
+            ], 200),
+        ]);
+
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'meta_gap_agent',
+            'name' => 'Meta Gap Agent',
+            'email' => 'metagap@example.com',
+            'phone' => '0244333777',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect('https://checkout.paystack.example/pay');
+
+        $agent = User::query()->where('username', 'meta_gap_agent')->firstOrFail();
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_agent_reg_meta_gap' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_agent_reg_meta_gap',
+                    'amount' => 2500,
+                    'metadata' => [],
+                    'paid_at' => now()->toIso8601String(),
+                    'channel' => 'mobile_money',
+                ],
+            ], 200),
+        ]);
+
+        $this->withSession([
+            'agent_shop_registration' => [
+                'reference' => 'stale_different_reference',
+                'user_id' => $agent->id,
+            ],
+        ])->get(route('register.agent-fee.callback', ['reference' => 'ref_agent_reg_meta_gap']))
+            ->assertRedirect(route('login'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $agent->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_reg_meta_gap',
+            'status' => 'success',
+        ]);
+    }
+
     public function test_agent_register_without_configured_fee_fails_validation(): void
     {
         $this->post(route('register'), [
