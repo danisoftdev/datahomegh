@@ -9,6 +9,8 @@ use App\Http\Middleware\WalletNotFrozenMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -34,8 +36,34 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'wallet/paystack/webhook',
+            'register/agent-fee/callback',
+            'wallet/topup/callback',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            if (! $request->isMethod('POST')) {
+                return null;
+            }
+
+            if ($request->is('register')) {
+                return redirect()
+                    ->route('register')
+                    ->withErrors([
+                        'registration' => __('Your session expired before the form was sent. Please fill the form again and continue to Paystack.'),
+                    ])
+                    ->withInput($request->except('password', 'password_confirmation'));
+            }
+
+            if ($request->is('login')) {
+                return redirect()
+                    ->route('login')
+                    ->withErrors([
+                        'username' => __('Your session expired. Please sign in again.'),
+                    ])
+                    ->withInput($request->only('username'));
+            }
+
+            return null;
+        });
     })->create();

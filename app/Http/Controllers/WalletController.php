@@ -98,7 +98,13 @@ class WalletController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        $reference = (string) ($request->query('reference') ?? $request->query('trxref') ?? '');
+        $reference = (string) (
+            $request->query('reference')
+            ?? $request->query('trxref')
+            ?? $request->input('reference')
+            ?? $request->input('trxref')
+            ?? ''
+        );
 
         if ($reference === '') {
             return redirect()->route('wallet.index')->withErrors(['paystack' => __('Missing payment reference.')]);

@@ -1,4 +1,5 @@
 @php($editing = isset($bundle))
+@php($showRoleListPrices = ! $editing || ! $bundle->isMtnAfaRegistration())
 <div class="space-y-4">
     <div>
         <label class="mb-1 block text-sm text-slate-400">{{ __('Network') }}</label>
@@ -25,10 +26,30 @@
         <input type="text" name="size_label" required value="{{ old('size_label', $editing ? $bundle->size_label : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
     </div>
     <div>
-        <label class="mb-1 block text-sm text-slate-400">{{ __('Price (GHS)') }}</label>
+        <label class="mb-1 block text-sm text-slate-400">{{ __('Base price (GHS)') }}</label>
         <input type="number" step="0.01" name="internal_cost" required value="{{ old('internal_cost', $editing ? $bundle->internal_cost : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-        <p class="mt-1 text-xs text-slate-500">{{ __('Data: base cost; buyer price may use role or resale plans. MTN AFA: this is the exact fee charged at checkout.') }}</p>
+        <p class="mt-1 text-xs text-slate-500">{{ __('Data: default list price when no role-specific price is set below. MTN AFA: this is the exact fee charged at checkout.') }}</p>
     </div>
+    @if ($showRoleListPrices)
+        <div class="rounded-lg border border-white/10 bg-[#1A1A2E]/50 p-4 space-y-3">
+            <p class="text-sm font-medium text-slate-200">{{ __('Role list prices (data bundles only)') }}</p>
+            <p class="text-xs text-slate-500">{{ __('Optional. When set, buyers see the buyer price and agents see the agent price for this platform bundle. Leave blank to use the base price for that role. Agent shop resale bundles are still priced by each agent; this does not change that.') }}</p>
+            <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Buyer list price (GHS)') }}</label>
+                <input type="number" step="0.01" min="0.01" name="buyer_list_price" value="{{ old('buyer_list_price', $buyerListPrice ?? '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('Same as base if empty') }}" />
+                @error('buyer_list_price')
+                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Agent list price (GHS)') }}</label>
+                <input type="number" step="0.01" min="0.01" name="agent_list_price" value="{{ old('agent_list_price', $agentListPrice ?? '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('Same as base if empty') }}" />
+                @error('agent_list_price')
+                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+    @endif
     <div>
         <label class="mb-1 block text-sm text-slate-400">{{ __('Stock count') }}</label>
         <input type="number" name="stock_count" required min="0" value="{{ old('stock_count', $editing ? $bundle->stock_count : 0) }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
