@@ -24,7 +24,8 @@ class NotificationService
     }
 
     /**
-     * Broadcast in-app notifications and queue email copies for active buyers/agents with a valid email address.
+     * Broadcast in-app notifications and queue email copies for buyers/agents with a valid email address.
+     * Email recipients match the same audience as per-user in-app rows (any account status, excluding soft-deleted users).
      *
      * @param  list<string>  $roles  Role slugs (buyer, agent only). Empty = global broadcast row (suppliers do not see broadcast rows in-app).
      */
@@ -88,7 +89,6 @@ class NotificationService
         }
 
         User::query()
-            ->where('status', 'active')
             ->whereHas('role', fn ($q) => $q->whereIn('slug', $roleSlugs))
             ->whereNotNull('email')
             ->where('email', '!=', '')
@@ -164,18 +164,53 @@ class NotificationService
     }
 
     /**
-     * Remove a notification. If it belongs to a broadcast group, delete every row in that group (template + per-user copies).
+     * Admin-only removal: personal rows are deleted; broadcast templates are archived from the admin list only
+     * (buyer/agent copies and in-app visibility stay unchanged).
      */
-    public function deleteByAdmin(Notification $notification): int
+    public function deleteByAdmin(Notification $notification, int $adminUserId): int
     {
-        return (int) DB::transaction(function () use ($notification): int {
-            $gid = $notification->broadcast_group_id;
-            if ($gid !== null && $gid !== '') {
-                return Notification::query()->where('broadcast_group_id', $gid)->delete();
+        return (int) DB::transaction(function () use ($notification, $adminUserId): int {
+            if ((int) $notification->user_id === $adminUserId) {
+                return $notification->delete() ? 1 : 0;
             }
 
-            return Notification::query()->whereKey($notification->getKey())->delete();
+            if ($notification->user_id === null && $notification->broadcast_group_id !== null && $notification->broadcast_group_id !== '') {
+                return $notification->update(['admin_archived_at' => now()]) ? 1 : 0;
+            }
+
+            return 0;
         });
+    }
+
+    /**
+     * Remove a notification from the signed-in user's inbox only (per-user row delete, or dismiss a shared broadcast row).
+     */
+    public function dismissFromInbox(int $userId, ?string $roleSlug, Notification $notification): bool
+    {
+        $visible = Notification::query()
+            ->forUser($userId, $roleSlug)
+            ->whereKey($notification->getKey())
+            ->exists();
+
+        if (! $visible) {
+            return false;
+        }
+
+        if ($notification->user_id !== null && (int) $notification->user_id === $userId) {
+            return (bool) $notification->delete();
+        }
+
+        if ($notification->user_id === null) {
+            DB::table('notification_dismissals')->insertOrIgnore([
+                'notification_id' => $notification->id,
+                'user_id' => $userId,
+                'created_at' => now(),
+            ]);
+
+            return true;
+        }
+
+        return false;
     }
 
     public function notifySuppliersNewAgentPendingApproval(User $agentUser): void

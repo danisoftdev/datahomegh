@@ -20,6 +20,7 @@ class Notification extends Model
         'type',
         'is_read',
         'created_at',
+        'admin_archived_at',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class Notification extends Model
         return [
             'is_read' => 'boolean',
             'created_at' => 'datetime',
+            'admin_archived_at' => 'datetime',
             'broadcast_role_slugs' => 'array',
         ];
     }
@@ -39,6 +41,11 @@ class Notification extends Model
     public function reads(): HasMany
     {
         return $this->hasMany(NotificationRead::class);
+    }
+
+    public function dismissals(): HasMany
+    {
+        return $this->hasMany(NotificationDismissal::class);
     }
 
     /**
@@ -72,7 +79,8 @@ class Notification extends Model
                                     ->where('nb.user_id', $userId)
                                     ->whereNotNull('notifications.broadcast_group_id');
                             });
-                    });
+                    })
+                    ->whereDoesntHave('dismissals', fn ($d) => $d->where('user_id', $userId));
             });
         });
     }
@@ -99,7 +107,8 @@ class Notification extends Model
                             ->where('nb.user_id', $userId)
                             ->whereNotNull('notifications.broadcast_group_id');
                     });
-            });
+            })
+            ->whereDoesntHave('dismissals', fn ($d) => $d->where('user_id', $userId));
     }
 
     public function isUnreadForUser(int $userId): bool
