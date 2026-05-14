@@ -394,6 +394,24 @@ class AuthTest extends TestCase
         $this->assertAuthenticated();
     }
 
+    public function test_register_via_agent_shop_shows_buyer_flow_and_hides_agent_shop_fields(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        User::factory()->create([
+            'role_id' => $agentRole->id,
+            'shop_slug' => 'shop-abc',
+            'shop_name' => 'Test Shop',
+            'status' => 'active',
+        ]);
+
+        $this->get(route('register', ['agentSlug' => 'shop-abc']))
+            ->assertOk()
+            ->assertSee((string) __('Buyer registration'), false)
+            ->assertSee('shop-abc', false)
+            ->assertDontSee('name="shop_name"', false)
+            ->assertDontSee((string) __('Continue to Paystack'), false);
+    }
+
     public function test_buyer_register_without_agent_link_is_active_and_logged_in(): void
     {
         $this->post(route('register'), [

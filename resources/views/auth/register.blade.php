@@ -91,30 +91,39 @@
                 </div>
             @else
                 <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
+                <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100">
+                    <p class="font-semibold text-white">{{ __('Buyer registration') }}</p>
+                    <p class="mt-2 text-xs leading-relaxed text-emerald-200/95">
+                        {{ __('You are creating a buyer account to order data bundles from this shop only. Your account will be linked to this agent shop code:') }}
+                    </p>
+                    <p class="mt-2 font-mono text-base font-bold tracking-wide text-[#FFD700]">{{ $agent->shop_slug }}</p>
+                </div>
             @endif
 
-            <div id="agent-shop-block" class="space-y-3">
-                @if (! empty($agentShopRegistrationFeeGhs))
-                    <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
-                        {{ __('Caution: when you submit this form you will be sent to Paystack to pay :amount GHS. Your agent shop application is only sent to the administrator for approval after that payment succeeds. If you do not pay, your account will not be submitted.', ['amount' => $agentShopRegistrationFeeGhs]) }}
+            @if (! $viaAgent)
+                <div id="agent-shop-block" class="space-y-3">
+                    @if (! empty($agentShopRegistrationFeeGhs))
+                        <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+                            {{ __('Caution: when you submit this form you will be sent to Paystack to pay :amount GHS. Your agent shop application is only sent to the administrator for approval after that payment succeeds. If you do not pay, your account will not be submitted.', ['amount' => $agentShopRegistrationFeeGhs]) }}
+                        </div>
+                    @else
+                        <div class="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs leading-relaxed text-red-200">
+                            {{ __('Agent registration is disabled until the platform administrator sets the shop link fee (greater than zero) in account settings.') }}
+                        </div>
+                    @endif
+                    <div>
+                        <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
+                        <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
+                            class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
+                        @error('shop_name')
+                            <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                        @enderror
                     </div>
-                @else
-                    <div class="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs leading-relaxed text-red-200">
-                        {{ __('Agent registration is disabled until the platform administrator sets the shop link fee (greater than zero) in account settings.') }}
-                    </div>
-                @endif
-                <div>
-                    <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
-                    <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
-                        class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
-                    @error('shop_name')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
+                    <p class="rounded-lg border border-white/10 bg-[#1A1A2E]/80 px-3 py-2 text-xs leading-relaxed text-slate-400">
+                        {{ __('Your shop code is 5 letters and numbers, generated automatically when you register. You cannot choose or change it. It will appear on the next screen after you submit.') }}
+                    </p>
                 </div>
-                <p class="rounded-lg border border-white/10 bg-[#1A1A2E]/80 px-3 py-2 text-xs leading-relaxed text-slate-400">
-                    {{ __('Your shop code is 5 letters and numbers, generated automatically when you register. You cannot choose or change it. It will appear on the next screen after you submit.') }}
-                </p>
-            </div>
+            @endif
 
             <div>
                 <label for="username" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Username') }}</label>

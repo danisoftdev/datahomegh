@@ -14,7 +14,7 @@
     }
     $waMessage = rawurlencode('Hi '.$shopTitle.", I'm interested in buying data bundles from your shop on DataHomeGH.");
     $waUrl = $waDigits !== '' ? 'https://wa.me/'.$waDigits.'?text='.$waMessage : null;
-    $registerUrl = url('/register?agent='.rawurlencode((string) $agent->shop_slug));
+    $registerUrl = route('register', ['agentSlug' => $agent->shop_slug]);
 @endphp
 
 @push('head')
@@ -104,8 +104,9 @@
             </div>
         </div>
 
-        <footer class="mt-12 border-t border-white/10 py-6 text-center text-xs text-slate-500">
-            Powered by DataHomeGH | datahomegh.shop
+        <footer class="mt-12 space-y-2 border-t border-white/10 py-6 text-center text-xs text-slate-500">
+            <p>Powered by DataHomeGH | datahomegh.shop</p>
+            <p>@include('partials.developer-credit')</p>
         </footer>
     </div>
 @endsection
