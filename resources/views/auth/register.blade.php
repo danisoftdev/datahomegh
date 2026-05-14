@@ -54,7 +54,7 @@
 
             @if (! $viaAgent)
                 <div id="buyer-agent-link-block">
-                    <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent shop code') }} <span class="text-slate-500">({{ __('optional — leave blank to buy from the supplier directly') }})</span></label>
+                    <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent code') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
                     <input id="agent_slug" name="agent_slug" value="{{ old('agent_slug') }}" type="text" autocomplete="off"
                         class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
                     @error('agent_slug')
