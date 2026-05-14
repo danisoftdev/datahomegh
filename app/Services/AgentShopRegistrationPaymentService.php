@@ -105,7 +105,7 @@ class AgentShopRegistrationPaymentService
             }
 
             $pesewasDiff = abs($expectedPesewas - $paidPesewas);
-            if ($pesewasDiff > 2) {
+            if ($pesewasDiff > 10) {
                 Log::error('agent_shop_registration_amount_mismatch', [
                     'reference' => $reference,
                     'user_id' => $userId,
