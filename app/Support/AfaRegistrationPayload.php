@@ -43,8 +43,9 @@ final class AfaRegistrationPayload
             throw new InvalidArgumentException($validator->errors()->first());
         }
 
-        /** @var array{name: string, phone: string, ghana_card_number: string, date_of_birth: string, occupation: string, location: string} */
-        return $validator->validated();
+        $validated = $validator->validated();
+
+        return $validated;
     }
 
     /**

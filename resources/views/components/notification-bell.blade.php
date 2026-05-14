@@ -64,10 +64,10 @@
             <template x-for="n in recent" :key="n.id">
                 <div class="border-b border-white/5 px-4 py-3 last:border-b-0">
                     <div class="flex items-start justify-between gap-3">
-                        <span class="min-w-0 flex-1 break-words font-medium leading-snug text-white" x-text="n.title"></span>
+                        <span class="min-w-0 flex-1 wrap-break-word font-medium leading-snug text-white" x-text="n.title"></span>
                         <span class="shrink-0 whitespace-nowrap text-xs text-slate-500" x-text="timeAgo(n.created_at)"></span>
                     </div>
-                    <p class="mt-1 line-clamp-3 break-words text-sm leading-relaxed text-slate-400" x-text="n.message"></p>
+                    <p class="mt-1 line-clamp-3 wrap-break-word text-sm leading-relaxed text-slate-400" x-text="n.message"></p>
                 </div>
             </template>
         </div>
