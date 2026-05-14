@@ -84,11 +84,34 @@ class AuthTest extends TestCase
             'shop_name' => 'Agent Business',
         ])->assertRedirect(route('login'));
 
-        $this->assertDatabaseHas('users', [
+        $row = [
             'username' => 'newagent',
             'status' => 'pending',
-        ]);
+        ];
+        $this->assertDatabaseHas('users', $row);
+
+        $agent = User::query()->where('username', 'newagent')->firstOrFail();
+        $this->assertNotNull($agent->shop_slug);
+        $this->assertSame(5, strlen((string) $agent->shop_slug));
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{5}$/', (string) $agent->shop_slug);
+        $this->assertMatchesRegularExpression('/[A-Za-z]/', (string) $agent->shop_slug);
+        $this->assertMatchesRegularExpression('/\d/', (string) $agent->shop_slug);
         $this->assertGuest();
+    }
+
+    public function test_buyer_register_without_full_name_defaults_to_username(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'buyer',
+            'username' => 'buyer_noname',
+            'phone' => '0244666777',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertRedirect(route('buyer.dashboard'));
+
+        $u = User::query()->where('username', 'buyer_noname')->firstOrFail();
+        $this->assertSame('buyer_noname', $u->name);
+        $this->assertAuthenticated();
     }
 
     public function test_agent_register_requires_email_and_shop_name(): void
@@ -101,6 +124,19 @@ class AuthTest extends TestCase
             'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ])->assertSessionHasErrors(['email', 'shop_name']);
+    }
+
+    public function test_agent_register_requires_full_name(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'badagent2',
+            'email' => 'bad2@example.com',
+            'phone' => '0244555666',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Has Shop',
+        ])->assertSessionHasErrors(['name']);
     }
 
     public function test_login_with_valid_credentials(): void

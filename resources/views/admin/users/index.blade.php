@@ -4,7 +4,12 @@
 @section('heading', __('Users'))
 
 @section('content')
-    <h1 class="mb-6 text-2xl font-bold text-white">{{ __('Agents & buyers') }}</h1>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-white">{{ __('Agents & buyers') }}</h1>
+        <a href="{{ route('admin.users.create-agent') }}" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E] hover:brightness-95">
+            {{ __('Create agent') }}
+        </a>
+    </div>
 
     <form method="get" class="mb-6 flex flex-wrap gap-3 rounded-xl border border-white/10 bg-[#16213E]/60 p-4">
         <select name="role" class="rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white">

@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\NotificationService;
+use App\Support\AgentRegistrationShopCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -59,12 +60,16 @@ class AuthController extends Controller
             ? ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')]
             : ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')];
 
+        $nameRules = $accountTypeForRules === 'agent'
+            ? ['required', 'string', 'max:100']
+            : ['nullable', 'string', 'max:100'];
+
         $validator = Validator::make($request->all(), [
             'account_type' => $viaAgentShop
                 ? ['sometimes', 'nullable', 'in:buyer,agent']
                 : ['required', 'in:buyer,agent'],
             'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')],
-            'name' => ['required', 'string', 'max:100'],
+            'name' => $nameRules,
             'email' => $emailRules,
             'phone' => ['required', 'string', 'regex:/^0\d{9}$/'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
@@ -113,15 +118,23 @@ class AuthController extends Controller
         $status = $accountType === 'agent' ? 'pending' : 'active';
 
         $user = DB::transaction(function () use ($data, $roleId, $status, $linkedAgent, $accountType) {
+            $displayName = trim((string) ($data['name'] ?? ''));
+            if ($displayName === '') {
+                $displayName = $data['username'];
+            }
+
+            $reservedShopSlug = $accountType === 'agent' ? AgentRegistrationShopCode::generateUnique() : null;
+
             $user = User::query()->create([
                 'username' => $data['username'],
-                'name' => $data['name'],
+                'name' => $displayName,
                 'email' => ! empty($data['email']) ? $data['email'] : null,
                 'phone' => $data['phone'],
                 'password' => $data['password'],
                 'role_id' => $roleId,
                 'agent_id' => $accountType === 'buyer' ? $linkedAgent?->id : null,
                 'shop_name' => $accountType === 'agent' ? ($data['shop_name'] ?? null) : null,
+                'shop_slug' => $reservedShopSlug,
                 'status' => $status,
             ]);
 
@@ -138,7 +151,8 @@ class AuthController extends Controller
             $this->notifyAgentRegistrationApprovers($user);
 
             return redirect()->route('login')
-                ->with('status', __('Your agent application was submitted. You will receive an email at :email when it is approved.', ['email' => $user->email]));
+                ->with('status', __('Your agent application was submitted. You will receive an email at :email when it is approved.', ['email' => $user->email]))
+                ->with('agent_reserved_code', $user->shop_slug);
         }
 
         Auth::login($user);
@@ -238,7 +252,8 @@ class AuthController extends Controller
     private function notifyAgentRegistrationApprovers(User $agentUser): void
     {
         $title = 'New agent registration';
-        $message = "{$agentUser->name} (@{$agentUser->username}) applied as an agent and awaits approval.";
+        $code = $agentUser->shop_slug ? ' (code: '.$agentUser->shop_slug.')' : '';
+        $message = "{$agentUser->name} (@{$agentUser->username}) applied as an agent and awaits approval.".$code;
         User::query()
             ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
             ->cursor()

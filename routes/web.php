@@ -145,6 +145,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('orders/{order}/notes', [AdminOrderController::class, 'addNote'])->name('orders.notes');
 
         Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::get('users/create-agent', [AdminUserController::class, 'createAgent'])->name('users.create-agent');
+        Route::post('users/create-agent', [AdminUserController::class, 'storeAgent'])->name('users.store-agent');
         Route::get('users/{user}', [AdminUserController::class, 'show'])->name('users.show');
         Route::post('users/{user}/approve-agent', [AdminUserController::class, 'approveAgent'])->name('users.approve-agent');
         Route::post('users/{user}/decline-agent', [AdminUserController::class, 'declineAgent'])->name('users.decline-agent');
