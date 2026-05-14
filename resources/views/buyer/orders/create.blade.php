@@ -7,10 +7,14 @@
         <h1 class="mb-2 text-2xl font-bold text-white">{{ __('New order') }}</h1>
         <p class="mb-6 text-sm text-slate-400">{{ __('Add one or more bundles (different networks are fine). Each line needs its own recipient number. You pay once for the total.') }}</p>
 
+        {{-- JSON must not sit inside x-data="..." or unescaped " from @json() ends the HTML attribute and the cart renders as text. --}}
+        <script type="application/json" id="buyer-order-cart-bundles">@json($bundlesJson)</script>
+        <script type="application/json" id="buyer-order-cart-old-items">@json(old('items'))</script>
+
         <div
             class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl"
             x-data="{
-                bundles: @json($bundlesJson),
+                bundles: JSON.parse(document.getElementById('buyer-order-cart-bundles').textContent),
                 walletBalance: {{ json_encode((float) $walletBalance) }},
                 rows: [],
                 confirm: false,
@@ -26,7 +30,10 @@
                     };
                 },
                 init() {
-                    const oldItems = @json(old('items'));
+                    let oldItems = null;
+                    try {
+                        oldItems = JSON.parse(document.getElementById('buyer-order-cart-old-items').textContent);
+                    } catch (e) {}
                     if (Array.isArray(oldItems) && oldItems.length > 0) {
                         this.rows = oldItems.map((it) => ({
                             _key: this.rowKey(),
@@ -54,6 +61,10 @@
                             row.network = (b.package_kind || 'data') === 'mtn_afa' ? 'MTN_AFA' : b.network;
                         }
                         if (p.get('phone_number')) row.phone = p.get('phone_number');
+                        const preBundle = row.bundleId ? this.bundles.find((x) => x.id === row.bundleId) : null;
+                        if (preBundle && (preBundle.package_kind || 'data') === 'mtn_afa' && row.phone) {
+                            row.reg.phone = row.phone;
+                        }
                         this.rows = [row];
                     }
                 },
