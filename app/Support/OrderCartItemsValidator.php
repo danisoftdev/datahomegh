@@ -52,10 +52,19 @@ final class OrderCartItemsValidator
             }
 
             if ($bundle->isMtnAfaRegistration()) {
+                $prefix = 'items.'.$i.'.afa_registration';
                 $afaValidator = Validator::make($request->all(), array_merge(
-                    ['items.'.$i.'.afa_registration' => ['required', 'array']],
-                    AfaRegistrationPayload::nestedRules('items.'.$i.'.afa_registration')
+                    [$prefix => ['required', 'array']],
+                    AfaRegistrationPayload::nestedRules($prefix)
                 ));
+                $afaValidator->setAttributeNames([
+                    $prefix.'.name' => __('Name'),
+                    $prefix.'.phone' => __('Number'),
+                    $prefix.'.ghana_card_number' => __('Ghana Card number'),
+                    $prefix.'.date_of_birth' => __('Date of birth'),
+                    $prefix.'.occupation' => __('Occupation'),
+                    $prefix.'.location' => __('Location'),
+                ]);
 
                 if ($afaValidator->fails()) {
                     return ['ok' => false, 'errors' => $afaValidator->errors()];

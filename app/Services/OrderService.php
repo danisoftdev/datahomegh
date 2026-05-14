@@ -349,6 +349,12 @@ class OrderService
 
     private function resolvePrice(User $buyer, BundlePackage $bundle): string
     {
+        // MTN AFA is a fixed registration/minute-call style product: one list price on the bundle,
+        // not tiered like data (no role price or agent resale overlay).
+        if ($bundle->isMtnAfaRegistration()) {
+            return bcadd((string) $bundle->internal_cost, '0', 2);
+        }
+
         $rolePrice = RolePrice::query()
             ->where('role_id', $buyer->role_id)
             ->where('bundle_package_id', $bundle->id)

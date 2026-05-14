@@ -85,7 +85,10 @@
                                 @if ($bp->name)
                                     <p class="mt-1 text-sm text-slate-400">{{ $bp->name }}</p>
                                 @endif
-                                <p class="mt-4 text-2xl font-bold text-[#FFD700]">GH₵ {{ number_format((float) $plan->price, 2) }}</p>
+                                @php
+                                    $displayPrice = $isAfa ? (float) $bp->internal_cost : (float) $plan->price;
+                                @endphp
+                                <p class="mt-4 text-2xl font-bold text-[#FFD700]">GH₵ {{ number_format($displayPrice, 2) }}</p>
                                 <a href="{{ $registerUrl }}" class="mt-auto pt-5">
                                     <span class="flex w-full items-center justify-center rounded-lg bg-[#FFD700] px-4 py-2.5 text-sm font-semibold text-[#1A1A2E] transition hover:bg-[#e6c200]">{{ __('Order Now') }}</span>
                                 </a>

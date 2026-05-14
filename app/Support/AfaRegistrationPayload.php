@@ -30,6 +30,14 @@ final class AfaRegistrationPayload
     public static function validateOrFail(?array $payload): array
     {
         $validator = Validator::make($payload ?? [], self::innerRules());
+        $validator->setAttributeNames([
+            'name' => __('Name'),
+            'phone' => __('Number'),
+            'ghana_card_number' => __('Ghana Card number'),
+            'date_of_birth' => __('Date of birth'),
+            'occupation' => __('Occupation'),
+            'location' => __('Location'),
+        ]);
 
         if ($validator->fails()) {
             throw new InvalidArgumentException($validator->errors()->first());

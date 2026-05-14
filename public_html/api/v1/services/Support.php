@@ -61,8 +61,13 @@ function api_slug_unique(PDO $pdo, string $base, ?int $exceptId = null): string
  */
 function api_resolve_price(PDO $pdo, array $buyer, array $bundle): string
 {
-    $roleId = (int) $buyer['role_id'];
     $bundleId = (int) $bundle['id'];
+    $packageKind = $bundle['package_kind'] ?? 'data';
+    if ($packageKind === 'mtn_afa') {
+        return api_money((string) $bundle['internal_cost']);
+    }
+
+    $roleId = (int) $buyer['role_id'];
 
     $st = $pdo->prepare(
         'SELECT price FROM role_prices WHERE role_id = ? AND bundle_package_id = ? LIMIT 1'
