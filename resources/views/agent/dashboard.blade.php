@@ -57,6 +57,7 @@
         <div class="rounded-xl border border-white/10 bg-[#16213E]/80 p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">{{ __('Quick links') }}</p>
             <div class="mt-3 flex flex-col gap-2 text-sm">
+                <a href="{{ route('agent.orders.create') }}" class="text-emerald-400 hover:underline">{{ __('New order') }}</a>
                 <a href="{{ route('agent.orders.index') }}" class="text-emerald-400 hover:underline">{{ __('My orders') }}</a>
                 <a href="{{ route('wallet.index') }}" class="text-emerald-400 hover:underline">{{ __('Wallet') }}</a>
             </div>

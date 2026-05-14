@@ -113,11 +113,12 @@ final class BundleApi
         }
 
         $pdo->prepare(
-            'INSERT INTO bundle_packages (agent_id, network, name, size_label, internal_cost, stock_count, is_available, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())'
+            'INSERT INTO bundle_packages (agent_id, network, package_kind, name, size_label, internal_cost, stock_count, is_available, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())'
         )->execute([
             $data['agent_id'],
             $data['network'],
+            $data['package_kind'],
             $data['name'],
             $data['size_label'],
             $data['internal_cost'],
@@ -164,11 +165,12 @@ final class BundleApi
         }
 
         $pdo->prepare(
-            'UPDATE bundle_packages SET agent_id = ?, network = ?, name = ?, size_label = ?, internal_cost = ?, stock_count = ?, is_available = ?, updated_at = NOW()
+            'UPDATE bundle_packages SET agent_id = ?, network = ?, package_kind = ?, name = ?, size_label = ?, internal_cost = ?, stock_count = ?, is_available = ?, updated_at = NOW()
              WHERE id = ?'
         )->execute([
             $agentIdForRow,
             $data['network'],
+            $data['package_kind'],
             $data['name'],
             $data['size_label'],
             $data['internal_cost'],
@@ -250,6 +252,15 @@ final class BundleApi
             Response::error('Invalid network', 422);
         }
 
+        $packageKind = isset($body['package_kind']) ? trim((string) $body['package_kind']) : 'data';
+        if (! in_array($packageKind, ['data', 'mtn_afa'], true)) {
+            Response::error('Invalid package_kind', 422);
+        }
+
+        if ($packageKind === 'mtn_afa' && $network !== 'MTN') {
+            Response::error('MTN AFA bundles require network MTN', 422);
+        }
+
         if ($name === '' || $sizeLabel === '') {
             Response::error('name and size_label required', 422);
         }
@@ -262,6 +273,7 @@ final class BundleApi
 
         return [
             'network' => $network,
+            'package_kind' => $packageKind,
             'name' => $name,
             'size_label' => $sizeLabel,
             'internal_cost' => api_money((string) $cost),

@@ -6,9 +6,13 @@
 @section('content')
     <h1 class="mb-6 text-2xl font-bold text-white">{{ __('Notifications') }}</h1>
 
+    @if (session('status'))
+        <div class="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">{{ session('status') }}</div>
+    @endif
+
     <div class="mb-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
         <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Broadcast message') }}</h2>
-        <p class="mb-4 text-sm text-slate-400">{{ __('Leave all roles unchecked to send one global notification and FCM to everyone. Select roles to also create per-user inbox rows for those roles.') }}</p>
+        <p class="mb-4 text-sm text-slate-400">{{ __('Leave all roles unchecked to send one global in-app notification to buyers and agents. Select roles to create per-user inbox rows for buyers and/or agents only. Recipients with a valid email on file also receive this message by email.') }}</p>
         <form id="admin-broadcast-form" class="max-w-xl space-y-3">
             @csrf
             <div>
@@ -16,7 +20,6 @@
                 <div class="flex flex-wrap gap-4 text-sm text-slate-300">
                     <label class="inline-flex items-center gap-2"><input type="checkbox" name="target_roles[]" value="buyer" class="rounded border-white/20 bg-[#1A1A2E]">{{ __('Buyers') }}</label>
                     <label class="inline-flex items-center gap-2"><input type="checkbox" name="target_roles[]" value="agent" class="rounded border-white/20 bg-[#1A1A2E]">{{ __('Agents') }}</label>
-                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="target_roles[]" value="supplier" class="rounded border-white/20 bg-[#1A1A2E]">{{ __('Suppliers') }}</label>
                 </div>
             </div>
             <div>
@@ -90,6 +93,7 @@
                     <th class="px-3 py-2">{{ __('Recipient') }}</th>
                     <th class="px-3 py-2">{{ __('Type') }}</th>
                     <th class="px-3 py-2">{{ __('Title') }}</th>
+                    <th class="px-3 py-2 w-28"></th>
                 </tr>
             </thead>
             <tbody>
@@ -99,6 +103,13 @@
                         <td class="px-3 py-2">{{ $n->user_id ? $n->user_id.' '.($n->user?->username ? '('.$n->user->username.')' : '') : __('All users') }}</td>
                         <td class="px-3 py-2">{{ $n->type }}</td>
                         <td class="px-3 py-2">{{ $n->title }}</td>
+                        <td class="px-3 py-2">
+                            <form method="post" action="{{ route('admin.notifications.destroy', $n) }}" class="inline" onsubmit="return confirm(@json(__('Delete this notification? If it is a broadcast, all copies for every recipient will be removed.')))">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs text-red-400 hover:text-red-300 hover:underline">{{ __('Delete') }}</button>
+                            </form>
+                        </td>
                     </tr>
                 @endforeach
             </tbody>

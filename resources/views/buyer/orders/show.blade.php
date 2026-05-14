@@ -18,7 +18,7 @@
             <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2">
                 <div>
                     <dt class="text-slate-500">{{ __('Network') }}</dt>
-                    <dd class="font-medium text-white">{{ $order->network }}</dd>
+                    <dd class="font-medium text-white">{{ $order->bundlePackage?->isMtnAfaRegistration() ? __('MTN AFA') : $order->network }}</dd>
                 </div>
                 <div>
                     <dt class="text-slate-500">{{ __('Phone') }}</dt>
@@ -33,6 +33,7 @@
                     <dd class="font-semibold text-[#FFD700]">{{ number_format((float) $order->amount, 2) }}</dd>
                 </div>
             </dl>
+            @include('orders.partials.afa-registration', ['order' => $order])
         </div>
 
         <div class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl">

@@ -72,6 +72,7 @@ class ApiTest extends TestCase
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
             'network' => 'MTN',
+            'package_kind' => 'data',
             'name' => 'API bundle',
             'size_label' => '1GB',
             'internal_cost' => '5.00',

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Agent;
 
 use App\Http\Controllers\Controller;
 use App\Models\BundlePackage;
+use App\Support\BundlePackageKind;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AgentBundleController extends Controller
@@ -105,6 +107,7 @@ class AgentBundleController extends Controller
     {
         $data = $request->validate([
             'network' => ['required', Rule::in(['MTN', 'Telecel', 'AirtelTigo'])],
+            'package_kind' => ['nullable', Rule::in(BundlePackageKind::all())],
             'name' => ['required', 'string', 'max:255'],
             'size_label' => ['required', 'string', 'max:100'],
             'internal_cost' => ['required', 'numeric', 'min:0'],
@@ -112,6 +115,12 @@ class AgentBundleController extends Controller
         ]);
 
         $data['is_available'] = $request->boolean('is_available', true);
+        $data['package_kind'] = $data['package_kind'] ?? BundlePackageKind::DATA;
+        if ($data['package_kind'] === BundlePackageKind::MTN_AFA && $data['network'] !== 'MTN') {
+            throw ValidationException::withMessages([
+                'network' => [__('MTN AFA bundles must use the MTN network.')],
+            ]);
+        }
 
         return $data;
     }

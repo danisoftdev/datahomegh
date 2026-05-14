@@ -137,7 +137,7 @@ final class OrderApi
         api_require_role($user, ROLE_BUYER);
 
         $body = api_json_body();
-        $network = $body['network'] ?? '';
+        $networkRaw = trim((string) ($body['network'] ?? ''));
         $phone = trim((string) ($body['phone_number'] ?? ''));
         $bundlePackageId = (int) ($body['bundle_id'] ?? $body['bundle_package_id'] ?? 0);
         $confirm = filter_var($body['confirm'] ?? false, FILTER_VALIDATE_BOOLEAN);
@@ -146,9 +146,11 @@ final class OrderApi
             Response::error('confirm must be true', 422);
         }
 
-        if (! in_array($network, ['MTN', 'Telecel', 'AirtelTigo'], true)) {
+        if (! in_array($networkRaw, ['MTN', 'MTN_AFA', 'Telecel', 'AirtelTigo'], true)) {
             Response::error('Invalid network', 422);
         }
+
+        $network = $networkRaw === 'MTN_AFA' ? 'MTN' : $networkRaw;
 
         if (! preg_match('/^0\d{9}$/', $phone)) {
             Response::error('phone_number must be 10 digits starting with 0', 422);
@@ -159,7 +161,7 @@ final class OrderApi
         }
 
         try {
-            $orderId = self::placeOrder($pdo, $user, $network, $phone, $bundlePackageId);
+            $orderId = self::placeOrder($pdo, $user, $network, $phone, $bundlePackageId, $body);
         } catch (Throwable $e) {
             Response::error($e->getMessage(), 400);
         }
@@ -295,8 +297,9 @@ final class OrderApi
 
     /**
      * @param  array<string, mixed>  $buyer
+     * @param  array<string, mixed>  $body
      */
-    private static function placeOrder(PDO $pdo, array $buyer, string $network, string $phone, int $bundlePackageId): int
+    private static function placeOrder(PDO $pdo, array $buyer, string $network, string $phone, int $bundlePackageId, array $body = []): int
     {
         $uid = (int) $buyer['id'];
 
@@ -354,6 +357,18 @@ final class OrderApi
                 throw new RuntimeException('This bundle is not available or is out of stock.');
             }
 
+            if (($bundle['network'] ?? '') !== $network) {
+                throw new RuntimeException('Network does not match selected bundle.');
+            }
+
+            $packageKind = $bundle['package_kind'] ?? 'data';
+            $afaJson = null;
+            if ($packageKind === 'mtn_afa') {
+                $afaJson = self::validateAfaRegistrationJson($body['afa_registration'] ?? null);
+            } elseif (isset($body['afa_registration']) && $body['afa_registration'] !== null && $body['afa_registration'] !== []) {
+                throw new RuntimeException('afa_registration is only for MTN AFA bundles.');
+            }
+
             $price = api_resolve_price($pdo, $u, $bundle);
 
             if (bccomp((string) $wallet['balance'], $price, 2) < 0) {
@@ -366,13 +381,14 @@ final class OrderApi
             api_wallet_debit_in_tx($pdo, $uid, $price, 'ORDER', $pendingLedgerRef, 'Order placement');
 
             $pdo->prepare(
-                'INSERT INTO orders (user_id, agent_id, network, phone_number, bundle_package_id, amount, status, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, \'PENDING\', NOW(), NOW())'
+                'INSERT INTO orders (user_id, agent_id, network, phone_number, afa_registration, bundle_package_id, amount, status, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, \'PENDING\', NOW(), NOW())'
             )->execute([
                 $uid,
                 $agentId !== null ? (int) $agentId : null,
                 $network,
                 $phone,
+                $afaJson,
                 $bundlePackageId,
                 $price,
             ]);
@@ -416,6 +432,41 @@ final class OrderApi
         } catch (Throwable $e) {
             $pdo->rollBack();
             throw $e;
+        }
+    }
+
+    private static function validateAfaRegistrationJson(mixed $ar): string
+    {
+        if (! is_array($ar)) {
+            throw new RuntimeException('afa_registration object is required for this bundle.');
+        }
+
+        $fields = ['name', 'phone', 'ghana_card_number', 'date_of_birth', 'occupation', 'location'];
+        $out = [];
+        foreach ($fields as $f) {
+            $v = isset($ar[$f]) ? trim((string) $ar[$f]) : '';
+            if ($v === '') {
+                throw new RuntimeException('afa_registration.'.$f.' is required.');
+            }
+            $out[$f] = $v;
+        }
+
+        if (! preg_match('/^0[235]\d{8}$/', $out['phone'])) {
+            throw new RuntimeException('afa_registration.phone must be a valid Ghana mobile number.');
+        }
+
+        $ts = strtotime($out['date_of_birth']);
+        if ($ts === false) {
+            throw new RuntimeException('afa_registration.date_of_birth is invalid.');
+        }
+        if ($ts >= strtotime('today')) {
+            throw new RuntimeException('afa_registration.date_of_birth must be before today.');
+        }
+
+        try {
+            return json_encode($out, JSON_THROW_ON_ERROR);
+        } catch (Throwable $e) {
+            throw new RuntimeException('Could not encode registration payload.');
         }
     }
 

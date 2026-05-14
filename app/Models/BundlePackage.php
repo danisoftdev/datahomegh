@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BundlePackageKind;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,7 @@ class BundlePackage extends Model
     protected $fillable = [
         'agent_id',
         'network',
+        'package_kind',
         'name',
         'size_label',
         'internal_cost',
@@ -51,5 +53,10 @@ class BundlePackage extends Model
     public function scopeByNetwork(Builder $query, string $net): Builder
     {
         return $query->where('network', $net);
+    }
+
+    public function isMtnAfaRegistration(): bool
+    {
+        return BundlePackageKind::isMtnAfa($this->package_kind ?? BundlePackageKind::DATA);
     }
 }

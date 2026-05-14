@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletController;
 use App\Http\Controllers\Agent\AgentBundleController;
 use App\Http\Controllers\Agent\AgentBuyerController;
+use App\Http\Controllers\Agent\AgentCheckoutController;
 use App\Http\Controllers\Agent\AgentController;
 use App\Http\Controllers\Agent\AgentOrderController;
 use App\Http\Controllers\Agent\AgentProfileController;
@@ -75,6 +76,10 @@ Route::middleware('auth')->group(function (): void {
         Route::match(['put', 'patch'], 'profile', [AgentProfileController::class, 'update'])->name('profile.update');
 
         Route::get('orders', [AgentOrderController::class, 'index'])->name('orders.index');
+        Route::middleware('wallet')->group(function (): void {
+            Route::get('orders/create', [AgentCheckoutController::class, 'create'])->name('orders.create');
+            Route::post('orders', [AgentCheckoutController::class, 'store'])->name('orders.store');
+        });
         Route::post('orders/bulk-update', [AgentOrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
         Route::get('orders/{order}', [AgentOrderController::class, 'show'])->name('orders.show');
         Route::patch('orders/{order}/status', [AgentOrderController::class, 'updateStatus'])->name('orders.status');
@@ -168,6 +173,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('roles/{role}/toggle', [AdminRoleController::class, 'toggle'])->name('roles.toggle');
 
         Route::get('notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
+        Route::delete('notifications/{notification}', [AdminNotificationController::class, 'destroy'])->name('notifications.destroy');
     });
 
     Route::middleware('supplier')->get('/admin/dashboard', fn () => redirect()->route('admin.dashboard'));

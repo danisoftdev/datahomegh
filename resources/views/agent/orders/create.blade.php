@@ -1,11 +1,12 @@
-@extends('layouts.buyer')
+@extends('layouts.agent')
 
 @section('title', __('New order') . ' — ' . config('app.name'))
+@section('heading', __('New order'))
 
 @section('content')
     <div class="mx-auto max-w-3xl">
         <h1 class="mb-2 text-2xl font-bold text-white">{{ __('New order') }}</h1>
-        <p class="mb-6 text-sm text-slate-400">{{ __('Add one or more bundles (different networks are fine). Each line needs its own recipient number. You pay once for the total.') }}</p>
+        <p class="mb-6 text-sm text-slate-400">{{ __('Add one or more bundles (different networks are fine). Each line needs its own recipient number. You pay once for the total from your agent wallet.') }}</p>
 
         <div
             class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl"
@@ -110,23 +111,13 @@
             }"
             x-init="init()"
         >
-            @if ($errors->any())
-                <div class="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                    <ul class="list-inside list-disc space-y-1">
-                        @foreach ($errors->all() as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <form method="post" action="{{ route('buyer.orders.store') }}" @submit="if (!canSubmit()) { $event.preventDefault(); } else { submitting = true; }" class="space-y-8">
+            <form method="post" action="{{ route('agent.orders.store') }}" @submit="if (!canSubmit()) { $event.preventDefault(); } else { submitting = true; }" class="space-y-8">
                 @csrf
 
                 <div class="space-y-6">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <h2 class="text-lg font-semibold text-white">{{ __('Order lines') }}</h2>
-                        <button type="button" @click="addRow()" :disabled="rows.length >= 30" class="rounded-lg border border-[#FFD700]/50 px-3 py-1.5 text-sm font-medium text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-40">
+                        <button type="button" @click="addRow()" :disabled="rows.length >= 30" class="rounded-lg border border-emerald-500/50 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40">
                             {{ __('Add another bundle') }}
                         </button>
                     </div>
@@ -211,7 +202,7 @@
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-slate-500">{{ __('Total') }}</dt>
-                            <dd class="text-lg font-bold text-[#FFD700]"><span x-text="totalPrice().toFixed(2)"></span> GHS</dd>
+                            <dd class="text-lg font-bold text-emerald-400"><span x-text="totalPrice().toFixed(2)"></span> GHS</dd>
                         </div>
                         <div class="flex justify-between pt-1">
                             <dt class="text-slate-500">{{ __('Your balance') }}</dt>
@@ -228,11 +219,11 @@
                     </template>
 
                     <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-black/30 p-4">
-                        <input type="checkbox" name="confirm" value="1" x-model="confirm" class="mt-1 size-4 rounded border-white/20 text-[#FFD700]" />
+                        <input type="checkbox" name="confirm" value="1" x-model="confirm" class="mt-1 size-4 rounded border-white/20 text-emerald-500" />
                         <span class="text-sm text-slate-300">{{ __('I confirm these orders. Charges apply for the full total immediately. Each recipient number is correct for its bundle.') }}</span>
                     </label>
 
-                    <button type="submit" :disabled="!canSubmit()" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-6 py-3 text-sm font-bold text-[#1A1A2E] disabled:opacity-40">
+                    <button type="submit" :disabled="!canSubmit()" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-6 py-3 text-sm font-bold text-[#0f0f1a] disabled:opacity-40">
                         <svg x-show="submitting" class="size-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span x-text="submitting ? '{{ __('Placing…') }}' : (rows.length > 1 ? '{{ __('Pay & place all') }}' : '{{ __('Place order') }}')"></span>
                     </button>

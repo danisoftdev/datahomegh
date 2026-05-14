@@ -47,7 +47,7 @@
                         @forelse ($recentOrders as $order)
                             <tr class="border-b border-white/5">
                                 <td class="px-4 py-3 font-mono text-xs">#{{ $order->id }}</td>
-                                <td class="px-4 py-3">{{ $order->network }}</td>
+                                <td class="px-4 py-3">{{ $order->bundlePackage?->isMtnAfaRegistration() ? __('MTN AFA') : $order->network }}</td>
                                 <td class="px-4 py-3">{{ $order->phone_number }}</td>
                                 <td class="px-4 py-3">{{ number_format((float) $order->amount, 2) }}</td>
                                 <td class="px-4 py-3"><span class="{{ $order->status_color }}">{{ $order->status }}</span></td>

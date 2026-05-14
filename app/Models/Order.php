@@ -13,6 +13,7 @@ class Order extends Model
         'agent_id',
         'network',
         'phone_number',
+        'afa_registration',
         'bundle_package_id',
         'amount',
         'status',
@@ -22,6 +23,7 @@ class Order extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'afa_registration' => 'array',
         ];
     }
 
