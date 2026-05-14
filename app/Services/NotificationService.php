@@ -177,4 +177,17 @@ class NotificationService
             return Notification::query()->whereKey($notification->getKey())->delete();
         });
     }
+
+    public function notifySuppliersNewAgentPendingApproval(User $agentUser): void
+    {
+        $title = 'New agent registration';
+        $code = $agentUser->shop_slug ? ' (code: '.$agentUser->shop_slug.')' : '';
+        $message = "{$agentUser->name} (@{$agentUser->username}) applied as an agent and awaits approval.".$code;
+        User::query()
+            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
+            ->cursor()
+            ->each(function (User $supplier) use ($title, $message): void {
+                $this->notify($supplier->id, $title, $message, 'agent_registered');
+            });
+    }
 }

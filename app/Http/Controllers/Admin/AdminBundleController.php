@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\BundlePackage;
-use App\Models\Role;
-use App\Models\User;
 use App\Support\BundlePackageKind;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +16,7 @@ class AdminBundleController extends Controller
     public function index(): View
     {
         $bundles = BundlePackage::query()
-            ->with('agent')
+            ->whereNull('agent_id')
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -28,13 +26,8 @@ class AdminBundleController extends Controller
     public function create(): View
     {
         $networks = ['MTN', 'Telecel', 'AirtelTigo'];
-        $agents = User::query()
-            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_AGENT))
-            ->where('status', 'active')
-            ->orderBy('username')
-            ->get(['id', 'username', 'shop_name']);
 
-        return view('admin.bundles.create', compact('networks', 'agents'));
+        return view('admin.bundles.create', compact('networks'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,18 +40,17 @@ class AdminBundleController extends Controller
 
     public function edit(BundlePackage $bundle): View
     {
-        $networks = ['MTN', 'Telecel', 'AirtelTigo'];
-        $agents = User::query()
-            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_AGENT))
-            ->where('status', 'active')
-            ->orderBy('username')
-            ->get(['id', 'username', 'shop_name']);
+        $this->assertSupplierBundle($bundle);
 
-        return view('admin.bundles.edit', compact('bundle', 'networks', 'agents'));
+        $networks = ['MTN', 'Telecel', 'AirtelTigo'];
+
+        return view('admin.bundles.edit', compact('bundle', 'networks'));
     }
 
     public function update(Request $request, BundlePackage $bundle): RedirectResponse
     {
+        $this->assertSupplierBundle($bundle);
+
         $bundle->update($this->validatedBundle($request));
 
         return redirect()->route('admin.bundles.index')->with('status', __('Bundle updated.'));
@@ -66,6 +58,8 @@ class AdminBundleController extends Controller
 
     public function destroy(BundlePackage $bundle): RedirectResponse
     {
+        $this->assertSupplierBundle($bundle);
+
         $bundle->delete();
 
         return redirect()->route('admin.bundles.index')->with('status', __('Bundle deleted.'));
@@ -73,6 +67,8 @@ class AdminBundleController extends Controller
 
     public function updateStock(Request $request, BundlePackage $bundle): RedirectResponse
     {
+        $this->assertSupplierBundle($bundle);
+
         $data = $request->validate([
             'stock_count' => ['required', 'integer', 'min:0', 'max:99999999'],
         ]);
@@ -88,6 +84,8 @@ class AdminBundleController extends Controller
 
     public function toggleAvailability(BundlePackage $bundle): RedirectResponse
     {
+        $this->assertSupplierBundle($bundle);
+
         $bundle->is_available = ! $bundle->is_available;
         $bundle->save();
 
@@ -100,7 +98,6 @@ class AdminBundleController extends Controller
     private function validatedBundle(Request $request): array
     {
         $data = $request->validate([
-            'agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'network' => ['required', Rule::in(['MTN', 'Telecel', 'AirtelTigo'])],
             'package_kind' => ['nullable', Rule::in(BundlePackageKind::all())],
             'name' => ['required', 'string', 'max:255'],
@@ -117,6 +114,13 @@ class AdminBundleController extends Controller
             ]);
         }
 
+        $data['agent_id'] = null;
+
         return $data;
+    }
+
+    private function assertSupplierBundle(BundlePackage $bundle): void
+    {
+        abort_unless($bundle->agent_id === null, 404);
     }
 }

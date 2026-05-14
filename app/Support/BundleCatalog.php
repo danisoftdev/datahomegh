@@ -28,7 +28,8 @@ final class BundleCatalog
     }
 
     /**
-     * Bundles an agent may purchase for resale / fulfilment: their own catalogue plus supplier (platform) bundles.
+     * Bundles an agent may purchase on agent checkout: supplier (platform) catalogue only.
+     * Agents manage their own resale bundles separately under “My bundles”; those are not self-checkout options.
      *
      * @return Collection<int, BundlePackage>
      */
@@ -36,10 +37,7 @@ final class BundleCatalog
     {
         return BundlePackage::query()
             ->available()
-            ->where(function ($q) use ($agent): void {
-                $q->where('agent_id', $agent->id)
-                    ->orWhereNull('agent_id');
-            })
+            ->whereNull('agent_id')
             ->orderBy('network')
             ->orderBy('name')
             ->get();

@@ -59,21 +59,11 @@
         </div>
     </div>
 
-    <div class="mt-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
-        <h3 class="mb-4 font-semibold text-white">{{ __('Timeline') }}</h3>
-        <ul class="space-y-3 text-sm">
-            @foreach ($histories as $h)
-                <li class="border-l-2 border-[#FFD700]/50 pl-4">
-                    <span class="font-medium text-white">{{ $h->new_status }}</span>
-                    @if ($h->old_status !== null)
-                        <span class="text-slate-500">({{ $h->old_status }})</span>
-                    @endif
-                    <span class="text-slate-500">— {{ $h->created_at?->format('Y-m-d H:i') }} — {{ $h->changedBy?->username }}</span>
-                    @if ($h->note)
-                        <p class="mt-1 text-slate-400">{{ $h->note }}</p>
-                    @endif
-                </li>
-            @endforeach
-        </ul>
+    <div class="mt-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl sm:p-8">
+        @include('orders.partials.status-history-timeline', [
+            'histories' => $histories,
+            'heading' => __('Timeline'),
+            'emptyMessage' => __('No history yet.'),
+        ])
     </div>
 @endsection

@@ -1,15 +1,6 @@
 @php($editing = isset($bundle))
 <div class="space-y-4">
     <div>
-        <label class="mb-1 block text-sm text-slate-400">{{ __('Agent (optional)') }}</label>
-        <select name="agent_id" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white">
-            <option value="">{{ __('— Supplier bundle —') }}</option>
-            @foreach ($agents as $a)
-                <option value="{{ $a->id }}" @selected(old('agent_id', $editing ? $bundle->agent_id : null) == $a->id)>{{ $a->username }} @if($a->shop_name) — {{ $a->shop_name }} @endif</option>
-            @endforeach
-        </select>
-    </div>
-    <div>
         <label class="mb-1 block text-sm text-slate-400">{{ __('Network') }}</label>
         <select name="network" required class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white">
             @foreach ($networks as $n)

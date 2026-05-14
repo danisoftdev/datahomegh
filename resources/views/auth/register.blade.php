@@ -27,6 +27,10 @@
 
         <h1 class="mb-6 text-center text-2xl font-bold tracking-tight text-white">{{ __('Create account') }}</h1>
 
+        @error('registration')
+            <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{{ $message }}</div>
+        @enderror
+
         <form method="post" action="{{ route('register') }}" class="space-y-5" id="register-form">
             @csrf
 
@@ -66,6 +70,15 @@
             @endif
 
             <div id="agent-shop-block" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} space-y-3">
+                @if (! empty($agentShopRegistrationFeeGhs))
+                    <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+                        {{ __('Caution: when you submit this form you will be sent to Paystack to pay :amount GHS. Your agent shop application is only sent to the administrator for approval after that payment succeeds. If you do not pay, your account will not be submitted.', ['amount' => $agentShopRegistrationFeeGhs]) }}
+                    </div>
+                @else
+                    <div class="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs leading-relaxed text-red-200">
+                        {{ __('Agent registration is disabled until the platform administrator sets the shop link fee (greater than zero) in account settings.') }}
+                    </div>
+                @endif
                 <div>
                     <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
                     <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
@@ -138,9 +151,9 @@
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
             </div>
 
-            <button type="submit"
+            <button type="submit" id="register-submit"
                 class="w-full rounded-lg bg-[#FFD700] px-4 py-3 text-center text-sm font-semibold text-[#1A1A2E] shadow-lg transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[#FFD700] focus:ring-offset-2 focus:ring-offset-[#1A1A2E]">
-                {{ __('Register') }}
+                <span id="register-submit-label">{{ __('Register') }}</span>
             </button>
         </form>
 
@@ -168,8 +181,10 @@
                     var nameBadge = document.getElementById('name-required-badge');
                     var nameHint = document.getElementById('name-optional-hint');
                     var nameInput = document.getElementById('name');
+                    var submitLabel = document.getElementById('register-submit-label');
                     if (shopBlock) shopBlock.classList.toggle('hidden', !agent);
                     if (buyerLink) buyerLink.classList.toggle('hidden', agent);
+                    if (submitLabel) submitLabel.textContent = agent ? {{ json_encode(__('Continue to Paystack')) }} : {{ json_encode(__('Register')) }};
                     if (badge) badge.classList.toggle('hidden', !agent);
                     if (hint) hint.classList.toggle('hidden', agent);
                     if (nameBadge) nameBadge.classList.toggle('hidden', !agent);

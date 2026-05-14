@@ -85,6 +85,16 @@
             </div>
         </div>
 
+        <div class="space-y-4 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
+            <h2 class="text-lg font-semibold text-[#FFD700]">{{ __('Agent self-registration') }}</h2>
+            <p class="text-xs text-slate-500">{{ __('Buyers who choose “Agent” on the public registration form must pay this amount through Paystack before their application is sent to you for approval. Leave blank to disable new agent sign-ups until you set a fee.') }}</p>
+            <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Shop link registration fee (GHS)') }}</label>
+                <input type="number" name="agent_shop_registration_fee_ghs" step="0.01" min="0.01" max="999999" value="{{ $agentShopRegistrationFeeGhs !== '' ? $agentShopRegistrationFeeGhs : '' }}" placeholder="{{ __('e.g. 50') }}" class="w-full max-w-xs rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                @error('agent_shop_registration_fee_ghs')<p class="mt-1 text-sm text-red-400">{{ $message }}</p>@enderror
+            </div>
+        </div>
+
         <button type="submit" class="rounded-lg bg-[#FFD700] px-6 py-2 text-sm font-semibold text-[#1A1A2E]">{{ __('Save changes') }}</button>
     </form>
 @endsection

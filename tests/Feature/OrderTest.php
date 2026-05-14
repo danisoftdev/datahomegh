@@ -532,4 +532,44 @@ class OrderTest extends TestCase
             'confirm' => true,
         ])->assertSessionHasErrors('bundle_package_id');
     }
+
+    public function test_supplier_cannot_manage_order_from_buyer_linked_to_agent(): void
+    {
+        $supplier = $this->supplierUser();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'agent_id' => $agent->id,
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '100.00',
+            'is_frozen' => false,
+        ]);
+
+        $bundle = $this->createAgentBundle($agent);
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ])->assertRedirect();
+
+        $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
+
+        $this->actingAs($supplier)->get(route('admin.orders.show', $order))->assertNotFound();
+        $this->actingAs($supplier)->patch(route('admin.orders.status', $order), [
+            'status' => 'PROCESSING',
+        ])->assertNotFound();
+    }
 }

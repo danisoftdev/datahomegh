@@ -49,31 +49,31 @@
         x-cloak
         x-transition
         @click.stop
-        class="absolute right-0 z-50 mt-2 w-full max-w-sm overflow-hidden rounded-xl border border-white/10 bg-navy shadow-xl sm:w-80"
+        class="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1.25rem))] min-w-[18rem] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-white/10 bg-navy text-left shadow-xl"
         style="display: none;"
     >
-        <div class="flex items-center justify-between border-b border-white/10 px-3 py-2">
+        <div class="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
             <span class="text-sm font-semibold text-white">{{ __('Notifications') }}</span>
-            <button type="button" @click="markAllRead()" class="text-xs font-medium text-primary hover:underline">
+            <button type="button" @click="markAllRead()" class="shrink-0 text-xs font-medium text-primary hover:underline">
                 {{ __('Mark all read') }}
             </button>
         </div>
-        <div class="max-h-72 overflow-y-auto">
-            <p x-show="loading" x-cloak class="px-3 py-4 text-sm text-slate-500" style="display: none;">{{ __('Loading…') }}</p>
-            <p x-show="!loading && recent.length === 0" x-cloak class="px-3 py-4 text-sm text-slate-500" style="display: none;">{{ __('No notifications yet.') }}</p>
+        <div class="max-h-80 overflow-y-auto overflow-x-hidden">
+            <p x-show="loading" x-cloak class="px-4 py-4 text-sm text-slate-500" style="display: none;">{{ __('Loading…') }}</p>
+            <p x-show="!loading && recent.length === 0" x-cloak class="px-4 py-4 text-sm text-slate-500" style="display: none;">{{ __('No notifications yet.') }}</p>
             <template x-for="n in recent" :key="n.id">
-                <div class="border-b border-white/5 px-3 py-2 last:border-b-0">
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="font-medium text-white" x-text="n.title"></span>
-                        <span class="shrink-0 text-xs text-slate-500" x-text="timeAgo(n.created_at)"></span>
+                <div class="border-b border-white/5 px-4 py-3 last:border-b-0">
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="min-w-0 flex-1 break-words font-medium leading-snug text-white" x-text="n.title"></span>
+                        <span class="shrink-0 whitespace-nowrap text-xs text-slate-500" x-text="timeAgo(n.created_at)"></span>
                     </div>
-                    <p class="mt-0.5 line-clamp-2 text-sm text-slate-400" x-text="n.message"></p>
+                    <p class="mt-1 line-clamp-3 break-words text-sm leading-relaxed text-slate-400" x-text="n.message"></p>
                 </div>
             </template>
         </div>
         <a
             href="{{ route('notifications.index') }}"
-            class="block border-t border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-primary hover:bg-white/10"
+            class="block border-t border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-medium text-primary hover:bg-white/10"
         >
             {{ __('View all') }}
         </a>

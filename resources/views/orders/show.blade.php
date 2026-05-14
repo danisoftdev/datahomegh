@@ -34,30 +34,12 @@
             @include('orders.partials.afa-registration', ['order' => $order])
         </div>
 
-        <div class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl backdrop-blur-sm">
-            <h2 class="text-lg font-semibold text-white">{{ __('Timeline') }}</h2>
-            <ol class="mt-4 space-y-4 border-l border-white/10 pl-4">
-                @forelse ($histories as $h)
-                    <li class="relative">
-                        <span class="absolute left-[-21px] top-1.5 size-2.5 rounded-full bg-[#FFD700]"></span>
-                        <p class="text-sm font-medium text-white">{{ $h->new_status }}
-                            @if ($h->old_status)
-                                <span class="font-normal text-slate-500">({{ __('from') }} {{ $h->old_status }})</span>
-                            @endif
-                        </p>
-                        <p class="text-xs text-slate-500">{{ $h->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}
-                            @if ($h->changedBy)
-                                — {{ $h->changedBy->username }}
-                            @endif
-                        </p>
-                        @if ($h->note)
-                            <p class="mt-1 text-sm text-slate-400">{{ $h->note }}</p>
-                        @endif
-                    </li>
-                @empty
-                    <li class="text-sm text-slate-500">{{ __('No history yet.') }}</li>
-                @endforelse
-            </ol>
+        <div class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl backdrop-blur-sm sm:p-8">
+            @include('orders.partials.status-history-timeline', [
+                'histories' => $histories,
+                'heading' => __('Timeline'),
+                'emptyMessage' => __('No history yet.'),
+            ])
         </div>
 
         @if (auth()->user()->isAgent() || auth()->user()->isSupplier())

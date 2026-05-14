@@ -162,4 +162,65 @@ class AdminAgentApprovalTest extends TestCase
             return $mail->shopSlug === $reserved;
         });
     }
+
+    public function test_approve_active_agent_returns_friendly_error(): void
+    {
+        $supplierRole = Role::query()->where('slug', Role::SLUG_SUPPLIER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $supplier = User::factory()->create([
+            'role_id' => $supplierRole->id,
+            'status' => 'active',
+        ]);
+
+        $active = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_name' => 'Already Active',
+            'shop_slug' => 'abc12',
+            'email' => 'active@example.com',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $active->id,
+            'balance' => 0,
+            'is_frozen' => false,
+        ]);
+
+        $this->actingAs($supplier)->from(route('admin.users.show', $active))
+            ->post(route('admin.users.approve-agent', $active))
+            ->assertRedirect(route('admin.users.show', $active))
+            ->assertSessionHas('error');
+
+        $this->assertSame('active', $active->fresh()->status);
+    }
+
+    public function test_decline_pending_payment_agent(): void
+    {
+        $supplierRole = Role::query()->where('slug', Role::SLUG_SUPPLIER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $supplier = User::factory()->create([
+            'role_id' => $supplierRole->id,
+            'status' => 'active',
+        ]);
+
+        $unpaid = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'pending_payment',
+            'shop_name' => 'Unpaid Shop',
+            'email' => 'unpaid@example.com',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $unpaid->id,
+            'balance' => 0,
+            'is_frozen' => false,
+        ]);
+
+        $this->actingAs($supplier)->post(route('admin.users.decline-agent', $unpaid))
+            ->assertSessionHas('status');
+
+        $this->assertSame('declined', $unpaid->fresh()->status);
+    }
 }

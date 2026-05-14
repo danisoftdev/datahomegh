@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Support\BundleCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -92,15 +93,15 @@ class AgentCheckoutTest extends TestCase
         $this->assertSame('89.00', (string) $agent->wallet->fresh()->balance);
     }
 
-    public function test_agent_can_order_own_bundle_from_catalog(): void
+    public function test_agent_can_order_platform_bundle_from_catalog(): void
     {
         $agent = $this->activeAgentWithWallet('100.00');
 
-        $own = BundlePackage::query()->create([
-            'agent_id' => $agent->id,
+        $platform = BundlePackage::query()->create([
+            'agent_id' => null,
             'network' => 'MTN',
             'package_kind' => 'data',
-            'name' => 'My shop bundle',
+            'name' => 'Platform bundle for agent checkout',
             'size_label' => '3GB',
             'internal_cost' => '7.00',
             'stock_count' => 5,
@@ -113,7 +114,7 @@ class AgentCheckoutTest extends TestCase
                 [
                     'network' => 'MTN',
                     'phone_number' => '0551234567',
-                    'bundle_package_id' => $own->id,
+                    'bundle_package_id' => $platform->id,
                 ],
             ],
         ])->assertRedirect(route('agent.orders.index'));
@@ -121,5 +122,37 @@ class AgentCheckoutTest extends TestCase
         $order = Order::query()->where('user_id', $agent->id)->firstOrFail();
         $this->assertSame((int) $agent->id, (int) $order->agent_id);
         $this->assertSame('93.00', (string) $agent->wallet->fresh()->balance);
+    }
+
+    public function test_agent_checkout_catalog_excludes_own_resale_bundles(): void
+    {
+        $agent = $this->activeAgentWithWallet('100.00');
+
+        BundlePackage::query()->create([
+            'agent_id' => $agent->id,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Agent resale only',
+            'size_label' => '1GB',
+            'internal_cost' => '4.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $platform = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Platform only',
+            'size_label' => '2GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $ids = BundleCatalog::forAgent($agent)->pluck('id')->all();
+
+        $this->assertContains($platform->id, $ids);
+        $this->assertCount(1, $ids);
     }
 }

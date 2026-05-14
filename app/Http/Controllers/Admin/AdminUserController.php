@@ -12,6 +12,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -138,14 +139,27 @@ class AdminUserController extends Controller
     public function approveAgent(User $user): RedirectResponse
     {
         abort_unless($user->role?->slug === Role::SLUG_AGENT, 404);
-        abort_unless($user->status === 'pending', 422);
+
+        if ($user->status !== 'pending') {
+            if ($user->status === 'pending_payment') {
+                return back()->with('error', __('This agent has not finished paying the shop link registration fee. They move to pending approval only after Paystack confirms payment.'));
+            }
+
+            if ($user->status === 'active') {
+                return back()->with('error', __('This agent is already approved.'));
+            }
+
+            return back()->with('error', __('This agent cannot be approved while their status is :status.', ['status' => $user->status]));
+        }
 
         if (! is_string($user->email) || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
             return back()->with('error', __('This agent must have a valid email on file before you can approve them. An approval message is sent to that address.'));
         }
 
         $shopName = $user->shop_name ?: $user->name;
-        abort_if(trim($shopName) === '', 422, 'Agent must have a shop name or display name before approval.');
+        if (trim($shopName) === '') {
+            return back()->with('error', __('The agent must have a shop name or display name before approval.'));
+        }
 
         $slug = is_string($user->shop_slug) && $user->shop_slug !== ''
             ? $user->shop_slug
@@ -169,7 +183,17 @@ class AdminUserController extends Controller
             'account_approved',
         );
 
-        Mail::to($user->email)->send(new AgentAccountApprovedMail($user, (string) $user->shop_slug));
+        try {
+            Mail::to($user->email)->send(new AgentAccountApprovedMail($user, (string) $user->shop_slug));
+        } catch (\Throwable $e) {
+            Log::warning('agent_approval_email_failed', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'message' => $e->getMessage(),
+            ]);
+
+            return back()->with('status', __('Agent approved. In-app notification was sent, but the approval email could not be sent. Configure MAIL_* in .env or check the server log.'));
+        }
 
         return back()->with('status', __('Agent approved and notified by email.'));
     }
@@ -177,7 +201,14 @@ class AdminUserController extends Controller
     public function declineAgent(User $user): RedirectResponse
     {
         abort_unless($user->role?->slug === Role::SLUG_AGENT, 404);
-        abort_unless($user->status === 'pending', 422);
+
+        if (! in_array($user->status, ['pending', 'pending_payment'], true)) {
+            if ($user->status === 'active') {
+                return back()->with('error', __('You cannot decline an agent who is already approved. Use hold or delete if needed.'));
+            }
+
+            return back()->with('error', __('This application cannot be declined while the status is :status.', ['status' => $user->status]));
+        }
 
         $user->status = 'declined';
         $user->save();

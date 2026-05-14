@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\UserProfileImageStorage;
@@ -20,13 +21,25 @@ class AdminProfileController extends Controller
 
         abort_unless($user->role?->slug === Role::SLUG_SUPPLIER, 403);
 
-        return view('admin.profile.edit', compact('user'));
+        return view('admin.profile.edit', [
+            'user' => $user,
+            'agentShopRegistrationFeeGhs' => (string) (old(
+                'agent_shop_registration_fee_ghs',
+                PlatformSetting::get(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '') ?? ''
+            )),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
         abort_unless($user->role?->slug === Role::SLUG_SUPPLIER, 403);
+
+        $request->merge([
+            'agent_shop_registration_fee_ghs' => $request->input('agent_shop_registration_fee_ghs') === '' || $request->input('agent_shop_registration_fee_ghs') === null
+                ? null
+                : $request->input('agent_shop_registration_fee_ghs'),
+        ]);
 
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')->ignore($user->id)],
@@ -41,6 +54,7 @@ class AdminProfileController extends Controller
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'profile_picture' => ['nullable', 'image', 'max:5120'],
             'logo' => ['nullable', 'image', 'max:8192'],
+            'agent_shop_registration_fee_ghs' => ['nullable', 'numeric', 'min:0.01', 'max:999999'],
         ]);
 
         $user->username = $validated['username'];
@@ -73,6 +87,16 @@ class AdminProfileController extends Controller
         }
 
         $user->save();
+
+        $feeRaw = $validated['agent_shop_registration_fee_ghs'] ?? null;
+        if ($feeRaw === null || $feeRaw === '') {
+            PlatformSetting::query()->where('key', PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS)->delete();
+        } else {
+            PlatformSetting::set(
+                PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS,
+                number_format((float) $feeRaw, 2, '.', ''),
+            );
+        }
 
         return redirect()->route('admin.profile.edit')->with('status', __('Account details updated.'));
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -49,6 +50,23 @@ class Order extends Model
     public function orderStatusHistories(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class);
+    }
+
+    /**
+     * Orders the supplier may list or fulfil: placed by agents (self-checkout) or by buyers not linked to an agent.
+     * Buyer orders under an agent are excluded (those are the agent’s queue).
+     */
+    public function scopeVisibleToSupplier(Builder $query): Builder
+    {
+        return $query->whereHas('user', function (Builder $userQuery): void {
+            $userQuery->where(function (Builder $w): void {
+                $w->whereHas('role', fn (Builder $r) => $r->where('slug', Role::SLUG_AGENT))
+                    ->orWhere(function (Builder $inner): void {
+                        $inner->whereHas('role', fn (Builder $r) => $r->where('slug', Role::SLUG_BUYER))
+                            ->whereNull('users.agent_id');
+                    });
+            });
+        });
     }
 
     public function getStatusColorAttribute(): string

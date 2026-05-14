@@ -17,9 +17,12 @@ class PaystackService
     }
 
     /**
+     * @param  array<string, mixed>  $options
+     *                                         callback_url?: string,
+     *                                         metadata?: array<string, mixed> (merged over defaults; overrides type)
      * @return array{authorization_url: string, reference: string}
      */
-    public function initializePayment(User $user, float|string $amount): array
+    public function initializePayment(User $user, float|string $amount, array $options = []): array
     {
         if ($this->secretKey === '') {
             throw new RuntimeException('Paystack secret key is not configured.');
@@ -30,6 +33,15 @@ class PaystackService
 
         $email = $user->email ?? "{$user->username}@users.datahomegh.local";
 
+        $callbackUrl = (string) ($options['callback_url'] ?? route('wallet.topup.callback', [], true));
+        $metadata = array_merge(
+            [
+                'user_id' => $user->id,
+                'type' => 'wallet_topup',
+            ],
+            $options['metadata'] ?? [],
+        );
+
         $response = Http::withToken($this->secretKey)
             ->acceptJson()
             ->asJson()
@@ -38,11 +50,8 @@ class PaystackService
                 'amount' => $amountPesewas,
                 'currency' => 'GHS',
                 'reference' => $reference,
-                'callback_url' => route('wallet.topup.callback'),
-                'metadata' => [
-                    'user_id' => $user->id,
-                    'type' => 'wallet_topup',
-                ],
+                'callback_url' => $callbackUrl,
+                'metadata' => $metadata,
             ]);
 
         $json = $response->json() ?? [];

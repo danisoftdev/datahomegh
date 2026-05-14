@@ -22,7 +22,7 @@ class AdminOrderController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Order::query()->with(['user', 'agent', 'bundlePackage']);
+        $query = Order::query()->visibleToSupplier()->with(['user', 'agent', 'bundlePackage']);
 
         $this->applyOrderFilters($request, $query);
 
@@ -41,6 +41,8 @@ class AdminOrderController extends Controller
 
     public function show(Order $order): View
     {
+        $this->assertOrderVisibleToSupplier($order);
+
         $order->load(['user', 'agent', 'bundlePackage']);
 
         $histories = $order->orderStatusHistories()->with('changedBy')->orderBy('id')->get();
@@ -53,6 +55,8 @@ class AdminOrderController extends Controller
 
     public function updateStatus(Request $request, Order $order): RedirectResponse
     {
+        $this->assertOrderVisibleToSupplier($order);
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(['PROCESSING', 'SENT', 'FAILED', 'REFUNDED'])],
             'note' => ['nullable', 'string', 'max:2000'],
@@ -91,9 +95,15 @@ class AdminOrderController extends Controller
             'visible_to_buyer' => ['sometimes', 'boolean'],
         ]);
 
+        $uniqueIds = array_values(array_unique($validated['order_ids']));
+        $matched = Order::query()->visibleToSupplier()->whereIn('id', $uniqueIds)->count();
+        if ($matched !== count($uniqueIds)) {
+            return back()->withErrors(['order_ids' => __('One or more orders are not in your queue.')]);
+        }
+
         try {
             $this->orderService->bulkUpdateStatus(
-                $validated['order_ids'],
+                $uniqueIds,
                 $validated['status'],
                 (int) $request->user()->id,
                 $validated['note'] ?? null,
@@ -108,6 +118,8 @@ class AdminOrderController extends Controller
 
     public function addNote(Request $request, Order $order): RedirectResponse
     {
+        $this->assertOrderVisibleToSupplier($order);
+
         $validated = $request->validate([
             'note' => ['required', 'string', 'max:5000'],
             'visible_to_buyer' => ['sometimes', 'boolean'],
@@ -125,7 +137,7 @@ class AdminOrderController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $query = Order::query()->with(['user', 'agent', 'bundlePackage']);
+        $query = Order::query()->visibleToSupplier()->with(['user', 'agent', 'bundlePackage']);
         $this->applyOrderFilters($request, $query);
 
         $filename = 'orders-'.now()->format('Y-m-d-His').'.csv';
@@ -189,5 +201,13 @@ class AdminOrderController extends Controller
             $phone = $request->string('phone');
             $query->where('phone_number', 'like', '%'.$phone.'%');
         }
+    }
+
+    private function assertOrderVisibleToSupplier(Order $order): void
+    {
+        abort_unless(
+            Order::query()->visibleToSupplier()->whereKey($order->getKey())->exists(),
+            404
+        );
     }
 }

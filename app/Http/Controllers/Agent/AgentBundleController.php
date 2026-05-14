@@ -54,6 +54,7 @@ class AgentBundleController extends Controller
         $this->assertOwnedBundle($request, $bundle);
 
         $data = $this->validatedBundle($request);
+        $data['agent_id'] = $request->user()->id;
         $bundle->update($data);
 
         return redirect()->route('agent.bundles.index')->with('status', __('Bundle updated.'));
