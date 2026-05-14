@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Agent;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\User;
 use Illuminate\View\View;
 
 class AgentController extends Controller
@@ -35,11 +36,15 @@ class AgentController extends Controller
             ? rtrim(url('/'), '/').'/'.$shopSlug
             : null;
 
+        $supplier = User::supplierUser();
+        $platformSupportContact = ($supplier !== null && $supplier->hasSupportContactContent()) ? $supplier : null;
+
         return view('agent.dashboard', [
             'todayOrdersCount' => $todayOrdersCount,
             'walletBalance' => $walletBalance,
             'pendingCount' => $pendingCount,
             'shopLink' => $shopLink,
+            'platformSupportContact' => $platformSupportContact,
         ]);
     }
 }

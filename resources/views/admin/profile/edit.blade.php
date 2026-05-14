@@ -50,7 +50,7 @@
 
         <div class="space-y-4 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
             <h2 class="text-lg font-semibold text-[#FFD700]">{{ __('Company & support') }}</h2>
-            <p class="text-xs text-slate-500">{{ __('Shown on password reset help and support flows.') }}</p>
+            <p class="text-xs text-slate-500">{{ __('These details appear on the dashboards of buyers who are not linked to an agent, and on every agent dashboard (WhatsApp chat, channel, and call links).') }}</p>
             <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('Company / brand name') }}</label>
                 <input type="text" name="shop_name" value="{{ old('shop_name', $user->shop_name) }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />

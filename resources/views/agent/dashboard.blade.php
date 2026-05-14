@@ -41,6 +41,12 @@
         </div>
     @endif
 
+    @if ($platformSupportContact ?? null)
+        <div class="mb-8">
+            <x-dashboard-contact-card :contact="$platformSupportContact" :heading="__('Platform support')" variant="agent" />
+        </div>
+    @endif
+
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-xl border border-white/10 bg-[#16213E]/80 p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">{{ __("Today's orders") }}</p>
