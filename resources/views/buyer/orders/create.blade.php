@@ -22,7 +22,7 @@
                         network: '',
                         phone: '',
                         bundleId: null,
-                        reg: { name: '', ghana_card_number: '', date_of_birth: '', occupation: '', location: '' },
+                        reg: { name: '', phone: '', ghana_card_number: '', date_of_birth: '', occupation: '', location: '' },
                     };
                 },
                 init() {
@@ -35,6 +35,7 @@
                             bundleId: it.bundle_package_id != null ? parseInt(it.bundle_package_id, 10) : null,
                             reg: {
                                 name: String(it.afa_registration?.name || ''),
+                                phone: String(it.afa_registration?.phone || it.phone_number || ''),
                                 ghana_card_number: String(it.afa_registration?.ghana_card_number || ''),
                                 date_of_birth: String(it.afa_registration?.date_of_birth || ''),
                                 occupation: String(it.afa_registration?.occupation || ''),
@@ -97,7 +98,8 @@
                     if (!b) return false;
                     if (!this.needsAfa(row)) return true;
                     const r = row.reg;
-                    return !!(String(r.name || '').trim() && String(r.ghana_card_number || '').trim()
+                    return !!(String(r.name || '').trim() && this.phoneOk(r.phone)
+                        && String(r.ghana_card_number || '').trim()
                         && String(r.date_of_birth || '').trim() && String(r.occupation || '').trim()
                         && String(r.location || '').trim());
                 },
@@ -160,7 +162,7 @@
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="mb-1 block text-xs text-slate-400">{{ __('Bundle') }}</label>
-                                    <select :name="'items[' + idx + '][bundle_package_id]'" x-model.number="row.bundleId" :disabled="!row.network" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white disabled:opacity-40">
+                                    <select :name="'items[' + idx + '][bundle_package_id]'" x-model.number="row.bundleId" @change="if (needsAfa(row) && !String(row.reg.phone || '').trim()) { row.reg.phone = row.phone; }" :disabled="!row.network" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white disabled:opacity-40">
                                         <option :value="null">{{ __('Select bundle…') }}</option>
                                         <template x-for="b in filteredBundles(row)" :key="b.id">
                                             <option :value="b.id" x-text="b.name + ' — ' + b.size_label + ' (' + parseFloat(b.price).toFixed(2) + ' GHS)'"></option>
@@ -172,22 +174,30 @@
 
                             <template x-if="needsAfa(row)">
                                 <div class="mt-4 space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                                    <input type="hidden" :name="'items[' + idx + '][afa_registration][phone]'" :value="row.phone" />
                                     <h3 class="text-sm font-semibold text-amber-200">{{ __('MTN AFA registration (this line)') }}</h3>
+                                    <p class="text-xs text-slate-400">{{ __('Complete every field below before you pay. These details are required for the registration bundle.') }}</p>
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <div class="sm:col-span-2">
-                                            <label class="mb-1 block text-xs text-slate-400">{{ __('Full name') }}</label>
-                                            <input type="text" :name="'items[' + idx + '][afa_registration][name]'" x-model="row.reg.name" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
+                                            <label class="mb-1 block text-xs text-slate-400">{{ __('Name') }}</label>
+                                            <input type="text" :name="'items[' + idx + '][afa_registration][name]'" x-model="row.reg.name" autocomplete="name" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
                                         </div>
-                                        <div>
+                                        <div class="sm:col-span-2">
+                                            <label class="mb-1 block text-xs text-slate-400">{{ __('Number') }}</label>
+                                            <div class="flex items-stretch gap-2 rounded-lg border border-white/10 bg-[#1A1A2E] p-2">
+                                                <span class="flex items-center px-2 text-lg" title="{{ __('Ghana') }}">🇬🇭</span>
+                                                <input type="tel" maxlength="10" :name="'items[' + idx + '][afa_registration][phone]'" x-model="row.reg.phone" placeholder="0XXXXXXXXX" class="min-w-0 flex-1 border-0 bg-transparent text-sm text-white placeholder:text-slate-600 focus:ring-0" />
+                                            </div>
+                                            <p class="mt-1 text-xs text-slate-500">{{ __('Ghana: 0 + 2, 3, or 5 + 8 digits') }}</p>
+                                        </div>
+                                        <div class="sm:col-span-2">
                                             <label class="mb-1 block text-xs text-slate-400">{{ __('Ghana Card number') }}</label>
-                                            <input type="text" :name="'items[' + idx + '][afa_registration][ghana_card_number]'" x-model="row.reg.ghana_card_number" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
+                                            <input type="text" :name="'items[' + idx + '][afa_registration][ghana_card_number]'" x-model="row.reg.ghana_card_number" autocomplete="off" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
                                         </div>
-                                        <div>
+                                        <div class="sm:col-span-2">
                                             <label class="mb-1 block text-xs text-slate-400">{{ __('Date of birth') }}</label>
                                             <input type="date" :name="'items[' + idx + '][afa_registration][date_of_birth]'" x-model="row.reg.date_of_birth" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
                                         </div>
-                                        <div>
+                                        <div class="sm:col-span-2">
                                             <label class="mb-1 block text-xs text-slate-400">{{ __('Occupation') }}</label>
                                             <input type="text" :name="'items[' + idx + '][afa_registration][occupation]'" x-model="row.reg.occupation" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white" />
                                         </div>
@@ -225,6 +235,10 @@
 
                     <template x-if="totalPrice() <= 0">
                         <p class="text-sm text-amber-200">{{ __('Complete each line with network, recipient number, and bundle.') }}</p>
+                    </template>
+
+                    <template x-if="rows.some((r) => needsAfa(r)) && !allRowsValid()">
+                        <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">{{ __('For MTN AFA lines, fill Name, Number, Ghana Card number, date of birth, occupation, and location before paying.') }}</p>
                     </template>
 
                     <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-black/30 p-4">

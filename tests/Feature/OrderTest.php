@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BundlePackage;
 use App\Models\Order;
 use App\Models\Role;
+use App\Models\RolePrice;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\OrderService;
@@ -291,6 +292,37 @@ class OrderTest extends TestCase
             'bundle_package_id' => $bundle->id,
             'confirm' => true,
         ])->assertSessionHasErrors();
+    }
+
+    public function test_mtn_afa_charges_bundle_list_price_not_role_price(): void
+    {
+        $bundle = $this->createMtnAfaBundle();
+        $buyer = $this->activeBuyerWithWallet('100.00');
+
+        RolePrice::query()->create([
+            'role_id' => $buyer->role_id,
+            'bundle_package_id' => $bundle->id,
+            'price' => '99.99',
+        ]);
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN_AFA',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+            'afa_registration' => [
+                'name' => 'Kwame Test',
+                'phone' => '0244123456',
+                'ghana_card_number' => 'GHA-123456789-0',
+                'date_of_birth' => '1995-06-15',
+                'occupation' => 'Trader',
+                'location' => 'Accra',
+            ],
+        ])->assertRedirect(route('buyer.orders.index'));
+
+        $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
+        $this->assertSame('12.00', (string) $order->amount);
+        $this->assertSame('88.00', (string) $buyer->wallet->fresh()->balance);
     }
 
     public function test_batch_checkout_creates_multiple_orders_one_wallet_session(): void
