@@ -57,7 +57,7 @@
             @endif
 
             @if (! $viaAgent)
-                <div id="buyer-agent-link-block">
+                <div id="buyer-agent-link-block" class="space-y-2" @if ($oldType === 'agent') hidden @endif>
                     <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent code') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
                     <input id="agent_slug" name="agent_slug" value="{{ old('agent_slug') }}" type="text" autocomplete="off"
                         class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
@@ -69,7 +69,7 @@
                 <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
             @endif
 
-            <div id="agent-shop-block" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} space-y-3">
+            <div id="agent-shop-block" class="space-y-3" @if (! ($oldType === 'agent' && ! $viaAgent)) hidden @endif>
                 @if (! empty($agentShopRegistrationFeeGhs))
                     <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
                         {{ __('Caution: when you submit this form you will be sent to Paystack to pay :amount GHS. Your agent shop application is only sent to the administrator for approval after that payment succeeds. If you do not pay, your account will not be submitted.', ['amount' => $agentShopRegistrationFeeGhs]) }}
@@ -104,8 +104,8 @@
             <div>
                 <label for="name" class="mb-1.5 block text-sm font-medium text-slate-300">
                     {{ __('Full name') }}
-                    <span id="name-required-badge" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} text-amber-400">*</span>
-                    <span id="name-optional-hint" class="{{ $oldType === 'agent' && ! $viaAgent ? 'hidden' : '' }} text-slate-500">({{ __('optional — defaults to username') }})</span>
+                    <span id="name-required-badge" class="text-amber-400" @if (! ($oldType === 'agent' && ! $viaAgent)) hidden @endif>*</span>
+                    <span id="name-optional-hint" class="text-slate-500" @if ($oldType === 'agent' && ! $viaAgent) hidden @endif>({{ __('optional — defaults to username') }})</span>
                 </label>
                 <input id="name" name="name" value="{{ old('name') }}" type="text" autocomplete="name"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
@@ -117,8 +117,8 @@
             <div>
                 <label for="email" class="mb-1.5 block text-sm font-medium text-slate-300">
                     {{ __('Email') }}
-                    <span id="email-required-badge" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} text-amber-400">*</span>
-                    <span id="email-optional-hint" class="{{ $oldType === 'agent' && ! $viaAgent ? 'hidden' : '' }} text-slate-500">({{ __('optional') }})</span>
+                    <span id="email-required-badge" class="text-amber-400" @if (! ($oldType === 'agent' && ! $viaAgent)) hidden @endif>*</span>
+                    <span id="email-optional-hint" class="text-slate-500" @if ($oldType === 'agent' && ! $viaAgent) hidden @endif>({{ __('optional') }})</span>
                 </label>
                 <input id="email" name="email" value="{{ old('email') }}" type="email" autocomplete="email"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
@@ -166,14 +166,11 @@
     @if (! $viaAgent)
         <script>
             (function () {
-                var form = document.getElementById('register-form');
-                if (!form) return;
-                function isAgent() {
-                    var r = form.querySelector('input[name="account_type"]:checked');
-                    return r && r.value === 'agent';
-                }
-                function sync() {
-                    var agent = isAgent();
+                function syncRegisterAccountType() {
+                    var form = document.getElementById('register-form');
+                    if (!form) return;
+                    var checked = form.querySelector('input[name="account_type"]:checked');
+                    var agent = !!(checked && checked.value === 'agent');
                     var shopBlock = document.getElementById('agent-shop-block');
                     var buyerLink = document.getElementById('buyer-agent-link-block');
                     var badge = document.getElementById('email-required-badge');
@@ -182,13 +179,15 @@
                     var nameHint = document.getElementById('name-optional-hint');
                     var nameInput = document.getElementById('name');
                     var submitLabel = document.getElementById('register-submit-label');
-                    if (shopBlock) shopBlock.classList.toggle('hidden', !agent);
-                    if (buyerLink) buyerLink.classList.toggle('hidden', agent);
-                    if (submitLabel) submitLabel.textContent = agent ? {{ json_encode(__('Continue to Paystack')) }} : {{ json_encode(__('Register')) }};
-                    if (badge) badge.classList.toggle('hidden', !agent);
-                    if (hint) hint.classList.toggle('hidden', agent);
-                    if (nameBadge) nameBadge.classList.toggle('hidden', !agent);
-                    if (nameHint) nameHint.classList.toggle('hidden', agent);
+                    if (shopBlock) shopBlock.hidden = !agent;
+                    if (buyerLink) buyerLink.hidden = agent;
+                    if (submitLabel) {
+                        submitLabel.textContent = agent ? {{ json_encode(__('Continue to Paystack')) }} : {{ json_encode(__('Register')) }};
+                    }
+                    if (badge) badge.hidden = !agent;
+                    if (hint) hint.hidden = agent;
+                    if (nameBadge) nameBadge.hidden = !agent;
+                    if (nameHint) nameHint.hidden = agent;
                     if (nameInput) {
                         if (agent) {
                             nameInput.setAttribute('required', 'required');
@@ -197,10 +196,21 @@
                         }
                     }
                 }
-                form.querySelectorAll('input[name="account_type"]').forEach(function (el) {
-                    el.addEventListener('change', sync);
-                });
-                sync();
+                function bind() {
+                    var form = document.getElementById('register-form');
+                    if (!form) return;
+                    form.querySelectorAll('input[name="account_type"]').forEach(function (el) {
+                        el.addEventListener('change', syncRegisterAccountType);
+                        el.addEventListener('input', syncRegisterAccountType);
+                        el.addEventListener('click', syncRegisterAccountType);
+                    });
+                    syncRegisterAccountType();
+                }
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', bind);
+                } else {
+                    bind();
+                }
             })();
         </script>
     @endif
