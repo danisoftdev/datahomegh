@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\NotificationService;
+use App\Services\UserAccountPurgeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class AdminUserController extends Controller
 {
     public function __construct(
         private readonly NotificationService $notificationService,
+        private readonly UserAccountPurgeService $userAccountPurgeService,
     ) {}
 
     public function index(Request $request): View
@@ -241,9 +243,9 @@ class AdminUserController extends Controller
         abort_if($user->id === $request->user()->id, 403);
         abort_unless(in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true), 404);
 
-        $user->delete();
+        $this->userAccountPurgeService->permanentlyDelete($user);
 
-        return redirect()->route('admin.users.index')->with('status', __('User removed.'));
+        return redirect()->route('admin.users.index')->with('status', __('User permanently removed. Their username and email can be used to register again.'));
     }
 
     public function issueResetCode(Request $request, User $user): RedirectResponse

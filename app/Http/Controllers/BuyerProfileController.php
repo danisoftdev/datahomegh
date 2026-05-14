@@ -4,15 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\UserAccountPurgeService;
 use App\Support\UserProfileImageStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class BuyerProfileController extends Controller
 {
+    public function __construct(
+        private readonly UserAccountPurgeService $userAccountPurgeService,
+    ) {}
+
     public function edit(Request $request): View
     {
         $user = $request->user();
@@ -56,5 +62,27 @@ class BuyerProfileController extends Controller
         $user->save();
 
         return redirect()->route('buyer.profile.edit')->with('status', __('Profile updated.'));
+    }
+
+    public function destroy(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role?->slug === Role::SLUG_BUYER, 403);
+
+        $request->validate([
+            'current_password' => ['required', 'current_password'],
+            'delete_account' => ['accepted'],
+        ]);
+
+        $userId = (int) $user->getKey();
+
+        Auth::logoutCurrentDevice();
+
+        $this->userAccountPurgeService->permanentlyDelete(User::query()->findOrFail($userId));
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login')->with('status', __('Your account has been permanently deleted. You may register again with the same details if you wish.'));
     }
 }
