@@ -31,33 +31,57 @@
             <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{{ $message }}</div>
         @enderror
 
-        <form method="post" action="{{ route('register') }}" class="space-y-5" id="register-form">
+        @if (! $viaAgent)
+            {{-- :has() toggles panels even if JS fails; radios use id+for + size so they stay clickable with Tailwind preflight --}}
+            <style>
+                #register-form #buyer-agent-link-block,
+                #register-form #agent-shop-block { display: none; }
+                #register-form:has(#register_account_buyer:checked) #buyer-agent-link-block { display: block; }
+                #register-form:has(#register_account_agent:checked) #agent-shop-block { display: block; }
+            </style>
+        @endif
+
+        <form method="post" action="{{ route('register') }}" class="space-y-5" id="register-form" autocomplete="off">
             @csrf
 
             @if ($viaAgent)
                 <input type="hidden" name="via_agent_shop" value="1" />
                 <input type="hidden" name="account_type" value="buyer" />
             @else
-                <fieldset class="space-y-2">
-                    <legend class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Account type') }}</legend>
-                    <div class="flex gap-4">
-                        <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
-                            <input type="radio" name="account_type" value="buyer" class="text-[#FFD700]" @checked($oldType === 'buyer') />
-                            {{ __('Buyer') }}
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
-                            <input type="radio" name="account_type" value="agent" class="text-[#FFD700]" @checked($oldType === 'agent') />
-                            {{ __('Agent') }}
-                        </label>
+                <div class="relative z-10 space-y-2" role="radiogroup" aria-labelledby="register-acct-type-label">
+                    <p id="register-acct-type-label" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Account type') }}</p>
+                    <div class="flex flex-wrap gap-6">
+                        <div class="flex items-center gap-2.5">
+                            <input
+                                id="register_account_buyer"
+                                type="radio"
+                                name="account_type"
+                                value="buyer"
+                                class="register-acct-radio mt-0.5 h-4 w-4 shrink-0 cursor-pointer appearance-auto border-slate-500 accent-[#FFD700] focus:outline-none focus:ring-2 focus:ring-[#FFD700]/50"
+                                @checked($oldType === 'buyer')
+                            />
+                            <label for="register_account_buyer" class="cursor-pointer select-none text-sm text-slate-200">{{ __('Buyer') }}</label>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <input
+                                id="register_account_agent"
+                                type="radio"
+                                name="account_type"
+                                value="agent"
+                                class="register-acct-radio mt-0.5 h-4 w-4 shrink-0 cursor-pointer appearance-auto border-slate-500 accent-[#FFD700] focus:outline-none focus:ring-2 focus:ring-[#FFD700]/50"
+                                @checked($oldType === 'agent')
+                            />
+                            <label for="register_account_agent" class="cursor-pointer select-none text-sm text-slate-200">{{ __('Agent') }}</label>
+                        </div>
                     </div>
                     @error('account_type')
                         <p class="text-sm text-red-400">{{ $message }}</p>
                     @enderror
-                </fieldset>
+                </div>
             @endif
 
             @if (! $viaAgent)
-                <div id="buyer-agent-link-block" class="space-y-2" @if ($oldType === 'agent') hidden @endif>
+                <div id="buyer-agent-link-block" class="space-y-2">
                     <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent code') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
                     <input id="agent_slug" name="agent_slug" value="{{ old('agent_slug') }}" type="text" autocomplete="off"
                         class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
@@ -69,7 +93,7 @@
                 <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
             @endif
 
-            <div id="agent-shop-block" class="space-y-3" @if (! ($oldType === 'agent' && ! $viaAgent)) hidden @endif>
+            <div id="agent-shop-block" class="space-y-3">
                 @if (! empty($agentShopRegistrationFeeGhs))
                     <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
                         {{ __('Caution: when you submit this form you will be sent to Paystack to pay :amount GHS. Your agent shop application is only sent to the administrator for approval after that payment succeeds. If you do not pay, your account will not be submitted.', ['amount' => $agentShopRegistrationFeeGhs]) }}
@@ -171,16 +195,12 @@
                     if (!form) return;
                     var checked = form.querySelector('input[name="account_type"]:checked');
                     var agent = !!(checked && checked.value === 'agent');
-                    var shopBlock = document.getElementById('agent-shop-block');
-                    var buyerLink = document.getElementById('buyer-agent-link-block');
                     var badge = document.getElementById('email-required-badge');
                     var hint = document.getElementById('email-optional-hint');
                     var nameBadge = document.getElementById('name-required-badge');
                     var nameHint = document.getElementById('name-optional-hint');
                     var nameInput = document.getElementById('name');
                     var submitLabel = document.getElementById('register-submit-label');
-                    if (shopBlock) shopBlock.hidden = !agent;
-                    if (buyerLink) buyerLink.hidden = agent;
                     if (submitLabel) {
                         submitLabel.textContent = agent ? {{ json_encode(__('Continue to Paystack')) }} : {{ json_encode(__('Register')) }};
                     }
@@ -199,10 +219,16 @@
                 function bind() {
                     var form = document.getElementById('register-form');
                     if (!form) return;
+                    form.addEventListener('change', function (e) {
+                        if (e.target && e.target.name === 'account_type') {
+                            syncRegisterAccountType();
+                        }
+                    }, true);
                     form.querySelectorAll('input[name="account_type"]').forEach(function (el) {
-                        el.addEventListener('change', syncRegisterAccountType);
                         el.addEventListener('input', syncRegisterAccountType);
-                        el.addEventListener('click', syncRegisterAccountType);
+                        el.addEventListener('click', function () {
+                            window.requestAnimationFrame(syncRegisterAccountType);
+                        });
                     });
                     syncRegisterAccountType();
                 }
