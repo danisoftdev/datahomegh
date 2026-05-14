@@ -112,7 +112,6 @@
             </nav>
         @endif
     </div>
-    <x-fcm-init />
     @stack('scripts')
 </body>
 </html>

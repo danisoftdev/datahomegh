@@ -18,8 +18,6 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\BuyerOrderController;
 use App\Http\Controllers\BuyerProfileController;
-use App\Http\Controllers\FcmController;
-use App\Http\Controllers\FirebaseWebConfigController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PasswordResetController;
@@ -31,9 +29,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
-
-Route::get('/firebase-web-config', FirebaseWebConfigController::class)
-    ->name('firebase.web-config');
 
 Route::get('/pending-approval', [AuthController::class, 'pendingApproval'])
     ->name('pending-approval');
@@ -65,7 +60,6 @@ Route::post('/wallet/paystack/webhook', [WalletController::class, 'webhook'])
     ->name('wallet.paystack.webhook');
 
 Route::middleware('auth')->group(function (): void {
-    Route::post('/fcm/register', [FcmController::class, 'register'])->name('fcm.register');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');

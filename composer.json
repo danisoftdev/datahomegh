@@ -9,7 +9,6 @@
         "php": "^8.2",
         "devrabiul/laravel-paystack": "^1.0",
         "intervention/image": "^3.7",
-        "kreait/laravel-firebase": "^6.2",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1"
