@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Agent;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use App\Support\UserProfileImageStorage;
 use Illuminate\Http\RedirectResponse;
@@ -11,19 +12,21 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
-class AgentProfileController extends Controller
+class AdminProfileController extends Controller
 {
     public function edit(Request $request): View
     {
-        $user = $request->user();
+        $user = $request->user()->loadMissing('role');
 
-        return view('agent.profile.edit', compact('user'));
+        abort_unless($user->role?->slug === Role::SLUG_SUPPLIER, 403);
+
+        return view('admin.profile.edit', compact('user'));
     }
 
     public function update(Request $request): RedirectResponse
     {
-        /** @var User $user */
         $user = $request->user();
+        abort_unless($user->role?->slug === Role::SLUG_SUPPLIER, 403);
 
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')->ignore($user->id)],
@@ -71,6 +74,6 @@ class AgentProfileController extends Controller
 
         $user->save();
 
-        return redirect()->route('agent.profile.edit')->with('status', __('Profile updated.'));
+        return redirect()->route('admin.profile.edit')->with('status', __('Account details updated.'));
     }
 }

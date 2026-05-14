@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('whatsapp_number')->nullable();
             $table->string('whatsapp_channel')->nullable();
             $table->text('business_description')->nullable();
-            $table->enum('status', ['pending', 'active', 'held', 'deleted'])->default('pending');
+            $table->enum('status', ['pending', 'active', 'held', 'declined', 'deleted'])->default('pending');
             $table->boolean('wallet_frozen')->default(false);
             $table->unsignedInteger('daily_order_limit')->nullable();
             $table->rememberToken();

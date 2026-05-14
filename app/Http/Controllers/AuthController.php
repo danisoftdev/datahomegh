@@ -44,17 +44,39 @@ class AuthController extends Controller
     public function register(Request $request): RedirectResponse
     {
         $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $viaAgentShop = $request->boolean('via_agent_shop');
+
+        $accountTypeForRules = $viaAgentShop
+            ? 'buyer'
+            : (string) $request->input('account_type', 'buyer');
+        if (! in_array($accountTypeForRules, ['buyer', 'agent'], true)) {
+            $accountTypeForRules = 'buyer';
+        }
+
+        $emailRules = $accountTypeForRules === 'agent'
+            ? ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')]
+            : ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')];
 
         $validator = Validator::make($request->all(), [
+            'account_type' => $viaAgentShop
+                ? ['sometimes', 'nullable', 'in:buyer,agent']
+                : ['required', 'in:buyer,agent'],
             'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')],
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')],
+            'email' => $emailRules,
             'phone' => ['required', 'string', 'regex:/^0\d{9}$/'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'agent_slug' => ['nullable', 'string', 'max:255'],
+            'shop_name' => [Rule::requiredIf($accountTypeForRules === 'agent'), 'nullable', 'string', 'max:255'],
         ]);
 
-        $validator->after(function ($validator) use ($request): void {
+        $validator->after(function ($validator) use ($request, $accountTypeForRules): void {
+            if ($accountTypeForRules === 'agent') {
+                return;
+            }
+
             $slug = $request->input('agent_slug');
             if (! $slug) {
                 return;
@@ -73,25 +95,34 @@ class AuthController extends Controller
 
         $data = $validator->validate();
 
-        $agent = null;
-        if (! empty($data['agent_slug'])) {
-            $agent = User::query()
+        $accountType = $viaAgentShop ? 'buyer' : (string) ($data['account_type'] ?? 'buyer');
+        if (! in_array($accountType, ['buyer', 'agent'], true)) {
+            $accountType = 'buyer';
+        }
+
+        $linkedAgent = null;
+        if ($accountType === 'buyer' && ! empty($data['agent_slug'])) {
+            $linkedAgent = User::query()
                 ->where('shop_slug', $data['agent_slug'])
                 ->where('status', 'active')
                 ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_AGENT))
                 ->first();
         }
 
-        $user = DB::transaction(function () use ($data, $buyerRole, $agent) {
+        $roleId = $accountType === 'agent' ? $agentRole->id : $buyerRole->id;
+        $status = $accountType === 'agent' ? 'pending' : 'active';
+
+        $user = DB::transaction(function () use ($data, $roleId, $status, $linkedAgent, $accountType) {
             $user = User::query()->create([
                 'username' => $data['username'],
                 'name' => $data['name'],
                 'email' => ! empty($data['email']) ? $data['email'] : null,
                 'phone' => $data['phone'],
                 'password' => $data['password'],
-                'role_id' => $buyerRole->id,
-                'agent_id' => $agent?->id,
-                'status' => 'pending',
+                'role_id' => $roleId,
+                'agent_id' => $accountType === 'buyer' ? $linkedAgent?->id : null,
+                'shop_name' => $accountType === 'agent' ? ($data['shop_name'] ?? null) : null,
+                'status' => $status,
             ]);
 
             Wallet::query()->create([
@@ -103,10 +134,17 @@ class AuthController extends Controller
             return $user;
         });
 
-        $this->notifyRegistrationApprovers($user, $agent);
+        if ($accountType === 'agent') {
+            $this->notifyAgentRegistrationApprovers($user);
 
-        return redirect()->route('pending-approval')
-            ->with('status', __('Registration submitted. Await approval.'));
+            return redirect()->route('login')
+                ->with('status', __('Your agent application was submitted. You will receive an email at :email when it is approved.', ['email' => $user->email]));
+        }
+
+        Auth::login($user);
+
+        return redirect()->route('buyer.dashboard')
+            ->with('status', __('Welcome! Your account is ready.'));
     }
 
     public function showLoginForm(): View
@@ -136,6 +174,16 @@ class AuthController extends Controller
         /** @var User $user */
         $user = Auth::user();
         $user->loadMissing('role');
+
+        if ($user->status === 'declined') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'username' => __('Your agent application was not approved.'),
+            ])->onlyInput('username');
+        }
 
         if ($user->status !== 'active') {
             Auth::logout();
@@ -187,19 +235,15 @@ class AuthController extends Controller
         };
     }
 
-    private function notifyRegistrationApprovers(User $buyer, ?User $agent): void
+    private function notifyAgentRegistrationApprovers(User $agentUser): void
     {
-        $title = 'New buyer registration';
-        $message = "{$buyer->name} (@{$buyer->username}) registered and is awaiting approval.";
+        $title = 'New agent registration';
+        $message = "{$agentUser->name} (@{$agentUser->username}) applied as an agent and awaits approval.";
         User::query()
             ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
             ->cursor()
             ->each(function (User $supplier) use ($title, $message): void {
-                $this->notificationService->notify($supplier->id, $title, $message, 'buyer_registered');
+                $this->notificationService->notify($supplier->id, $title, $message, 'agent_registered');
             });
-
-        if ($agent !== null) {
-            $this->notificationService->notify($agent->id, $title, $message, 'buyer_registered');
-        }
     }
 }

@@ -30,10 +30,20 @@
             <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Profile') }}</h2>
             <dl class="grid gap-2 text-sm sm:grid-cols-2">
                 <div><dt class="text-slate-500">{{ __('Name') }}</dt><dd>{{ $user->name }}</dd></div>
-                <div><dt class="text-slate-500">{{ __('Email') }}</dt><dd>{{ $user->email ?? '—' }}</dd></div>
+                <div><dt class="text-slate-500">{{ __('Email') }}</dt><dd class="flex flex-wrap items-center gap-2">
+                    @if ($user->email)
+                        <a href="mailto:{{ $user->email }}" class="text-[#FFD700] hover:underline">{{ $user->email }}</a>
+                    @else
+                        —
+                    @endif
+                    @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending' && ! $user->email)
+                        <span class="text-xs text-amber-400">({{ __('Required before approval') }})</span>
+                    @endif
+                </dd></div>
                 <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $user->phone }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Role') }}</dt><dd>{{ $user->role?->name }} ({{ $user->role?->slug }})</dd></div>
                 <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd>{{ $user->status }}</dd></div>
+                <div><dt class="text-slate-500">{{ __('Shop name') }}</dt><dd>{{ $user->shop_name ?? '—' }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Shop slug') }}</dt><dd>{{ $user->shop_slug ?? '—' }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Daily order limit') }}</dt><dd>{{ $user->daily_order_limit ?? '∞' }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Wallet balance') }}</dt><dd>{{ $user->wallet ? number_format((float) $user->wallet->balance, 2) : '—' }} GHS</dd></div>
@@ -43,7 +53,11 @@
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending')
                     <form method="post" action="{{ route('admin.users.approve-agent', $user) }}">
                         @csrf
-                        <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Approve agent') }}</button>
+                        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Approve agent') }}</button>
+                    </form>
+                    <form method="post" action="{{ route('admin.users.decline-agent', $user) }}" onsubmit="return confirm(@json(__('Decline this agent application? They will not be able to sign in.')))">
+                        @csrf
+                        <button type="submit" class="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600">{{ __('Decline') }}</button>
                     </form>
                 @endif
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'active')
