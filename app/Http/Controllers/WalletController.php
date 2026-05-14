@@ -6,8 +6,10 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Models\PaystackTransaction;
 use App\Models\User;
 use App\Models\WalletLedger;
+use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Services\WalletService;
+use App\Support\PaystackChargeMetadata;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +25,7 @@ class WalletController extends Controller
     public function __construct(
         private readonly WalletService $walletService,
         private readonly PaystackService $paystackService,
+        private readonly AgentShopRegistrationPaymentService $agentShopRegistrationPaymentService,
     ) {}
 
     public function index(Request $request): View
@@ -113,7 +116,7 @@ class WalletController extends Controller
             return redirect()->route('wallet.index')->withErrors(['paystack' => __('Payment was not successful.')]);
         }
 
-        $userId = (int) ($this->metadataUserId($data) ?? 0);
+        $userId = (int) (PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
         $authId = (int) $request->user()->id;
 
         if ($userId !== $authId) {
@@ -165,7 +168,7 @@ class WalletController extends Controller
             return response()->json([], 200);
         }
 
-        $userId = (int) ($this->metadataUserId($data) ?? 0);
+        $userId = (int) (PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
 
         if ($userId <= 0) {
             return response()->json([], 200);
@@ -235,6 +238,13 @@ class WalletController extends Controller
      */
     private function applyVerifiedPaystackCredit(int $userId, string $reference, string $amountGhs, array $verifyData): void
     {
+        $meta = PaystackChargeMetadata::fromChargeData($verifyData);
+        if ($meta['type'] === 'agent_shop_registration') {
+            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $verifyData);
+
+            return;
+        }
+
         $target = User::query()->with('role')->find($userId);
         if ($target !== null && $target->fundsWalletViaAgent()) {
             Log::warning('paystack_wallet_credit_refused_agent_linked_buyer', [
@@ -276,29 +286,6 @@ class WalletController extends Controller
                 ],
             );
         });
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function metadataUserId(array $data): ?int
-    {
-        $meta = $data['metadata'] ?? null;
-
-        if (is_string($meta)) {
-            $decoded = json_decode($meta, true);
-            $meta = is_array($decoded) ? $decoded : null;
-        }
-
-        if (is_array($meta) && isset($meta['user_id'])) {
-            return (int) $meta['user_id'];
-        }
-
-        if (is_object($meta) && isset($meta->user_id)) {
-            return (int) $meta->user_id;
-        }
-
-        return null;
     }
 
     /**

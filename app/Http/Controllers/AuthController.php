@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PaystackTransaction;
+use App\Models\PlatformSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
-use App\Services\NotificationService;
+use App\Services\PaystackService;
 use App\Support\AgentRegistrationShopCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,11 +16,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use RuntimeException;
 
 class AuthController extends Controller
 {
     public function __construct(
-        private readonly NotificationService $notificationService,
+        private readonly PaystackService $paystackService,
     ) {}
 
     public function showRegisterForm(Request $request, ?string $agentSlug = null): View
@@ -39,6 +42,7 @@ class AuthController extends Controller
 
         return view('auth.register', [
             'agent' => $agent,
+            'agentShopRegistrationFeeGhs' => PlatformSetting::agentShopRegistrationFeeGhs(),
         ]);
     }
 
@@ -115,7 +119,18 @@ class AuthController extends Controller
         }
 
         $roleId = $accountType === 'agent' ? $agentRole->id : $buyerRole->id;
-        $status = $accountType === 'agent' ? 'pending' : 'active';
+        $status = $accountType === 'agent' ? 'pending_payment' : 'active';
+
+        if ($accountType === 'agent') {
+            $feeGhs = PlatformSetting::agentShopRegistrationFeeGhs();
+            if ($feeGhs === null) {
+                return back()
+                    ->withErrors([
+                        'registration' => __('Agent registration is temporarily unavailable because the administrator has not set a valid shop link fee (greater than zero). Please try again later.'),
+                    ])
+                    ->withInput();
+            }
+        }
 
         $user = DB::transaction(function () use ($data, $roleId, $status, $linkedAgent, $accountType) {
             $displayName = trim((string) ($data['name'] ?? ''));
@@ -148,11 +163,59 @@ class AuthController extends Controller
         });
 
         if ($accountType === 'agent') {
-            $this->notifyAgentRegistrationApprovers($user);
+            $feeGhs = PlatformSetting::agentShopRegistrationFeeGhs();
+            if ($feeGhs === null) {
+                $user->forceDelete();
 
-            return redirect()->route('login')
-                ->with('status', __('Your agent application was submitted. You will receive an email at :email when it is approved.', ['email' => $user->email]))
-                ->with('agent_reserved_code', $user->shop_slug);
+                return back()
+                    ->withErrors([
+                        'registration' => __('Agent registration is temporarily unavailable because the administrator has not set a valid shop link fee (greater than zero). Please try again later.'),
+                    ])
+                    ->withInput();
+            }
+
+            try {
+                $init = $this->paystackService->initializePayment($user, (float) $feeGhs, [
+                    'callback_url' => route('register.agent-fee.callback', [], true),
+                    'metadata' => [
+                        'type' => 'agent_shop_registration',
+                    ],
+                ]);
+            } catch (RuntimeException $e) {
+                $user->forceDelete();
+
+                return back()->withErrors(['registration' => $e->getMessage()])->withInput();
+            }
+
+            if (trim($init['authorization_url'] ?? '') === '') {
+                $user->forceDelete();
+
+                return back()
+                    ->withErrors(['registration' => __('Payment could not be started. Please try again later.')])
+                    ->withInput();
+            }
+
+            PaystackTransaction::query()->updateOrCreate(
+                ['reference' => $init['reference']],
+                [
+                    'user_id' => $user->id,
+                    'amount' => $feeGhs,
+                    'status' => 'pending',
+                    'channel' => null,
+                    'paid_at' => null,
+                    'metadata' => [
+                        'kind' => 'agent_shop_registration',
+                        'initialized_at' => now()->toIso8601String(),
+                    ],
+                ],
+            );
+
+            $request->session()->put('agent_shop_registration', [
+                'reference' => $init['reference'],
+                'user_id' => $user->id,
+            ]);
+
+            return redirect()->away($init['authorization_url']);
         }
 
         Auth::login($user);
@@ -196,6 +259,16 @@ class AuthController extends Controller
 
             return back()->withErrors([
                 'username' => __('Your agent application was not approved.'),
+            ])->onlyInput('username');
+        }
+
+        if ($user->status === 'pending_payment') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'username' => __('Complete your shop link registration payment on Paystack, or register again. Your application is not submitted for approval until payment succeeds.'),
             ])->onlyInput('username');
         }
 
@@ -247,18 +320,5 @@ class AuthController extends Controller
             Role::SLUG_BUYER => route('buyer.dashboard', [], false),
             default => '/',
         };
-    }
-
-    private function notifyAgentRegistrationApprovers(User $agentUser): void
-    {
-        $title = 'New agent registration';
-        $code = $agentUser->shop_slug ? ' (code: '.$agentUser->shop_slug.')' : '';
-        $message = "{$agentUser->name} (@{$agentUser->username}) applied as an agent and awaits approval.".$code;
-        User::query()
-            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
-            ->cursor()
-            ->each(function (User $supplier) use ($title, $message): void {
-                $this->notificationService->notify($supplier->id, $title, $message, 'agent_registered');
-            });
     }
 }

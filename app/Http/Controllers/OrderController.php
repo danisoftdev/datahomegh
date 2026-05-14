@@ -103,6 +103,11 @@ class OrderController extends Controller
     private function authorizeOrderAccess(User $user, Order $order): void
     {
         if ($user->role?->slug === Role::SLUG_SUPPLIER) {
+            abort_unless(
+                Order::query()->visibleToSupplier()->whereKey($order->getKey())->exists(),
+                403
+            );
+
             return;
         }
 
@@ -125,6 +130,11 @@ class OrderController extends Controller
     private function authorizeStaffOrder(User $user, Order $order): void
     {
         if ($user->role?->slug === Role::SLUG_SUPPLIER) {
+            abort_unless(
+                Order::query()->visibleToSupplier()->whereKey($order->getKey())->exists(),
+                403
+            );
+
             return;
         }
 

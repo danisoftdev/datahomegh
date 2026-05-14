@@ -18,15 +18,18 @@ class AdminController extends Controller
         $monthEnd = now()->endOfMonth();
 
         $todayOrdersCount = Order::query()
+            ->visibleToSupplier()
             ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->count();
 
         $sentRevenueMonth = (string) Order::query()
+            ->visibleToSupplier()
             ->where('status', 'SENT')
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
 
         $pendingCount = Order::query()
+            ->visibleToSupplier()
             ->whereIn('status', ['PENDING', 'PROCESSING'])
             ->count();
 
@@ -39,6 +42,7 @@ class AdminController extends Controller
             ->count();
 
         $recentOrders = Order::query()
+            ->visibleToSupplier()
             ->with(['user', 'agent', 'bundlePackage'])
             ->latest()
             ->limit(10)

@@ -50,14 +50,19 @@
             </dl>
 
             <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
+                @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending_payment')
+                    <p class="mb-2 w-full text-xs text-amber-200">{{ __('Awaiting registration fee on Paystack. Approve is available only after status becomes pending (payment confirmed). You may still decline this application.') }}</p>
+                @endif
+                @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && in_array($user->status, ['pending', 'pending_payment'], true))
+                    <form method="post" action="{{ route('admin.users.decline-agent', $user) }}" onsubmit="return confirm(@json(__('Decline this agent application? They will not be able to sign in.')))">
+                        @csrf
+                        <button type="submit" class="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600">{{ __('Decline') }}</button>
+                    </form>
+                @endif
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending')
                     <form method="post" action="{{ route('admin.users.approve-agent', $user) }}">
                         @csrf
                         <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Approve agent') }}</button>
-                    </form>
-                    <form method="post" action="{{ route('admin.users.decline-agent', $user) }}" onsubmit="return confirm(@json(__('Decline this agent application? They will not be able to sign in.')))">
-                        @csrf
-                        <button type="submit" class="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-600">{{ __('Decline') }}</button>
                     </form>
                 @endif
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'active')

@@ -61,8 +61,13 @@ final class OrderApi
         $from = trim((string) ($_GET['from'] ?? $_GET['date_from'] ?? ''));
         $to = trim((string) ($_GET['to'] ?? $_GET['date_to'] ?? ''));
 
-        $sql = 'SELECT o.* FROM orders o WHERE 1=1';
-        $params = [];
+        $sql = 'SELECT o.* FROM orders o WHERE EXISTS (
+            SELECT 1 FROM users u
+            INNER JOIN roles r ON r.id = u.role_id
+            WHERE u.id = o.user_id AND u.deleted_at IS NULL
+            AND (r.slug = ? OR (r.slug = ? AND u.agent_id IS NULL))
+        )';
+        $params = [ROLE_AGENT, ROLE_BUYER];
 
         if ($status !== '' && in_array($status, ['PENDING', 'PROCESSING', 'SENT', 'FAILED', 'REFUNDED'], true)) {
             $sql .= ' AND o.status = ?';
@@ -250,6 +255,10 @@ final class OrderApi
         $slug = $user['role_slug'] ?? '';
 
         if ($slug === ROLE_SUPPLIER) {
+            if (! self::orderVisibleToSupplier($pdo, (int) ($order['user_id'] ?? 0))) {
+                Response::error('Forbidden', 403);
+            }
+
             return;
         }
 
@@ -279,6 +288,10 @@ final class OrderApi
         $slug = $user['role_slug'] ?? '';
 
         if ($slug === ROLE_SUPPLIER) {
+            if (! self::orderVisibleToSupplier($pdo, (int) ($order['user_id'] ?? 0))) {
+                Response::error('Forbidden', 403);
+            }
+
             return;
         }
 
@@ -293,6 +306,24 @@ final class OrderApi
         }
 
         Response::error('Forbidden', 403);
+    }
+
+    private static function orderVisibleToSupplier(PDO $pdo, int $orderUserId): bool
+    {
+        if ($orderUserId < 1) {
+            return false;
+        }
+
+        $st = $pdo->prepare(
+            'SELECT 1 FROM users u
+             INNER JOIN roles r ON r.id = u.role_id
+             WHERE u.id = ? AND u.deleted_at IS NULL
+             AND (r.slug = ? OR (r.slug = ? AND u.agent_id IS NULL))
+             LIMIT 1'
+        );
+        $st->execute([$orderUserId, ROLE_AGENT, ROLE_BUYER]);
+
+        return $st->fetchColumn() !== false;
     }
 
     /**

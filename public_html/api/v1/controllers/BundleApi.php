@@ -21,9 +21,8 @@ final class BundleApi
         }
 
         if ($slug === ROLE_SUPPLIER) {
-            $sql = 'SELECT bp.*, u.username AS agent_username FROM bundle_packages bp
-                 LEFT JOIN users u ON u.id = bp.agent_id AND u.deleted_at IS NULL
-                 WHERE 1=1'.$networkClause.'
+            $sql = 'SELECT bp.*, NULL AS agent_username FROM bundle_packages bp
+                 WHERE bp.agent_id IS NULL'.$networkClause.'
                  ORDER BY bp.id DESC LIMIT 500';
             $st = $pdo->prepare($sql);
             $st->execute($networkParams);
@@ -33,18 +32,19 @@ final class BundleApi
         }
 
         if ($slug === ROLE_AGENT) {
-            $sql = 'SELECT * FROM bundle_packages WHERE agent_id = ?';
-            if ($networkFilter !== '' && in_array($networkFilter, ['MTN', 'Telecel', 'AirtelTigo'], true)) {
-                $sql .= ' AND network = ?';
-            }
-            $sql .= ' ORDER BY id DESC LIMIT 500';
+            $sql = 'SELECT bp.*, NULL AS resale_plan_price, NULL AS resale_plan_label
+                FROM bundle_packages bp
+                WHERE bp.is_available = 1 AND bp.stock_count >= 1 AND bp.agent_id IS NULL
+                '.$networkClause.'
+                ORDER BY bp.network, bp.name LIMIT 500';
             $st = $pdo->prepare($sql);
-            $params = [(int) $user['id']];
-            if ($networkFilter !== '' && in_array($networkFilter, ['MTN', 'Telecel', 'AirtelTigo'], true)) {
-                $params[] = $networkFilter;
+            $st->execute($networkParams);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as &$row) {
+                $row['price'] = api_resolve_price($pdo, $user, $row);
             }
-            $st->execute($params);
-            Response::success($st->fetchAll(PDO::FETCH_ASSOC));
+            unset($row);
+            Response::success($rows);
 
             return;
         }
@@ -65,7 +65,7 @@ final class BundleApi
                 FROM bundle_packages bp
                 LEFT JOIN resale_plans rp ON rp.bundle_package_id = bp.id AND rp.agent_id = ? AND rp.is_active = 1
                 WHERE bp.is_available = 1 AND bp.stock_count >= 1
-                AND (bp.agent_id IS NULL OR bp.agent_id = ?)
+                AND bp.agent_id = ?
                 '.$networkClause.'
                 ORDER BY bp.network, bp.name LIMIT 500';
                 $params = [$agentId, $agentId];
@@ -97,17 +97,7 @@ final class BundleApi
         if ($slug === ROLE_AGENT) {
             $data['agent_id'] = (int) $user['id'];
         } elseif ($slug === ROLE_SUPPLIER) {
-            $data['agent_id'] = isset($body['agent_id']) ? (int) $body['agent_id'] : null;
-            if ($data['agent_id'] !== null) {
-                $chk = $pdo->prepare(
-                    'SELECT 1 FROM users u INNER JOIN roles r ON r.id = u.role_id
-                     WHERE u.id = ? AND r.slug = ? AND u.status = ? AND u.deleted_at IS NULL LIMIT 1'
-                );
-                $chk->execute([$data['agent_id'], ROLE_AGENT, 'active']);
-                if ($chk->fetchColumn() === false) {
-                    Response::error('Invalid agent_id', 422);
-                }
-            }
+            $data['agent_id'] = null;
         } else {
             Response::error('Forbidden', 403);
         }
@@ -146,22 +136,7 @@ final class BundleApi
 
         $agentIdForRow = (int) $user['id'];
         if ($slug === ROLE_SUPPLIER) {
-            if (array_key_exists('agent_id', $body)) {
-                $agentIdForRow = $body['agent_id'] === null || $body['agent_id'] === '' ? null : (int) $body['agent_id'];
-            } else {
-                $agentIdForRow = $bundle['agent_id'] !== null ? (int) $bundle['agent_id'] : null;
-            }
-
-            if ($agentIdForRow !== null) {
-                $chk = $pdo->prepare(
-                    'SELECT 1 FROM users u INNER JOIN roles r ON r.id = u.role_id
-                     WHERE u.id = ? AND r.slug = ? AND u.status = ? AND u.deleted_at IS NULL LIMIT 1'
-                );
-                $chk->execute([$agentIdForRow, ROLE_AGENT, 'active']);
-                if ($chk->fetchColumn() === false) {
-                    Response::error('Invalid agent_id', 422);
-                }
-            }
+            $agentIdForRow = null;
         }
 
         $pdo->prepare(
@@ -226,6 +201,11 @@ final class BundleApi
         $slug = $user['role_slug'] ?? '';
 
         if ($slug === ROLE_SUPPLIER) {
+            $agentRaw = $bundle['agent_id'] ?? null;
+            if ($agentRaw !== null && $agentRaw !== '' && (int) $agentRaw !== 0) {
+                Response::error('Forbidden', 403);
+            }
+
             return;
         }
 

@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Notification;
+use App\Models\PlatformSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -17,6 +20,163 @@ class AuthTest extends TestCase
     {
         parent::setUp();
         $this->seed(RolesAndPermissionsSeeder::class);
+    }
+
+    public function test_agent_register_redirects_to_paystack_and_creates_pending_payment_user(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_1',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'newagent',
+            'name' => 'New Agent',
+            'email' => 'newagent@example.com',
+            'phone' => '0244333444',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ]);
+
+        $response->assertRedirect('https://checkout.paystack.example/pay');
+
+        $this->assertDatabaseHas('users', [
+            'username' => 'newagent',
+            'status' => 'pending_payment',
+        ]);
+
+        $agent = User::query()->where('username', 'newagent')->firstOrFail();
+        $this->assertNotNull($agent->shop_slug);
+        $this->assertSame(5, strlen((string) $agent->shop_slug));
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{5}$/', (string) $agent->shop_slug);
+        $this->assertMatchesRegularExpression('/[A-Za-z]/', (string) $agent->shop_slug);
+        $this->assertMatchesRegularExpression('/\d/', (string) $agent->shop_slug);
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_reg_1',
+            'user_id' => $agent->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertSame(0, Notification::query()->where('type', 'agent_registered')->count());
+        $this->assertGuest();
+    }
+
+    public function test_agent_register_callback_after_payment_notifies_suppliers_and_sets_pending(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_2',
+                ],
+            ], 200),
+        ]);
+
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'payagent',
+            'name' => 'Pay Agent',
+            'email' => 'payagent@example.com',
+            'phone' => '0244333555',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect('https://checkout.paystack.example/pay');
+
+        $agent = User::query()->where('username', 'payagent')->firstOrFail();
+
+        $supplierRole = Role::query()->where('slug', Role::SLUG_SUPPLIER)->firstOrFail();
+        $supplier = User::factory()->create([
+            'role_id' => $supplierRole->id,
+            'username' => 'supplier_notify',
+            'status' => 'active',
+        ]);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_agent_reg_2' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_agent_reg_2',
+                    'amount' => 2500,
+                    'metadata' => [
+                        'user_id' => $agent->id,
+                        'type' => 'agent_shop_registration',
+                    ],
+                    'paid_at' => now()->toIso8601String(),
+                    'channel' => 'mobile_money',
+                ],
+            ], 200),
+        ]);
+
+        $this->withSession([
+            'agent_shop_registration' => [
+                'reference' => 'ref_agent_reg_2',
+                'user_id' => $agent->id,
+            ],
+        ])->get(route('register.agent-fee.callback', ['reference' => 'ref_agent_reg_2']))
+            ->assertRedirect(route('login'));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $agent->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_reg_2',
+            'status' => 'success',
+        ]);
+
+        $this->assertGreaterThanOrEqual(1, Notification::query()
+            ->where('type', 'agent_registered')
+            ->where('user_id', $supplier->id)
+            ->count());
+    }
+
+    public function test_agent_register_without_configured_fee_fails_validation(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'no_fee_agent',
+            'name' => 'No Fee',
+            'email' => 'nofee@example.com',
+            'phone' => '0244333666',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Shop',
+        ])->assertSessionHasErrors('registration');
+
+        $this->assertDatabaseMissing('users', ['username' => 'no_fee_agent']);
+    }
+
+    public function test_login_fails_for_pending_payment_agent(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        User::factory()->create([
+            'role_id' => $agentRole->id,
+            'username' => 'unpaidagent',
+            'password' => 'SecretPass1!',
+            'status' => 'pending_payment',
+        ]);
+
+        $this->from(route('login'))->post(route('login'), [
+            'username' => 'unpaidagent',
+            'password' => 'SecretPass1!',
+        ])->assertSessionHasErrors('username');
+
+        $this->assertGuest();
     }
 
     public function test_buyer_can_register_via_agent_link(): void
@@ -71,34 +231,6 @@ class AuthTest extends TestCase
         $this->assertAuthenticated();
     }
 
-    public function test_agent_register_is_pending_and_redirects_to_login(): void
-    {
-        $this->post(route('register'), [
-            'account_type' => 'agent',
-            'username' => 'newagent',
-            'name' => 'New Agent',
-            'email' => 'newagent@example.com',
-            'phone' => '0244333444',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-            'shop_name' => 'Agent Business',
-        ])->assertRedirect(route('login'));
-
-        $row = [
-            'username' => 'newagent',
-            'status' => 'pending',
-        ];
-        $this->assertDatabaseHas('users', $row);
-
-        $agent = User::query()->where('username', 'newagent')->firstOrFail();
-        $this->assertNotNull($agent->shop_slug);
-        $this->assertSame(5, strlen((string) $agent->shop_slug));
-        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{5}$/', (string) $agent->shop_slug);
-        $this->assertMatchesRegularExpression('/[A-Za-z]/', (string) $agent->shop_slug);
-        $this->assertMatchesRegularExpression('/\d/', (string) $agent->shop_slug);
-        $this->assertGuest();
-    }
-
     public function test_buyer_register_without_full_name_defaults_to_username(): void
     {
         $this->post(route('register'), [
@@ -116,6 +248,8 @@ class AuthTest extends TestCase
 
     public function test_agent_register_requires_email_and_shop_name(): void
     {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '10.00');
+
         $this->post(route('register'), [
             'account_type' => 'agent',
             'username' => 'badagent',
@@ -128,6 +262,8 @@ class AuthTest extends TestCase
 
     public function test_agent_register_requires_full_name(): void
     {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '10.00');
+
         $this->post(route('register'), [
             'account_type' => 'agent',
             'username' => 'badagent2',

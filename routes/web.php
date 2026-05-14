@@ -15,6 +15,7 @@ use App\Http\Controllers\Agent\AgentController;
 use App\Http\Controllers\Agent\AgentOrderController;
 use App\Http\Controllers\Agent\AgentProfileController;
 use App\Http\Controllers\Agent\AgentResalePlanController;
+use App\Http\Controllers\AgentRegistrationFeeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\BuyerOrderController;
@@ -38,6 +39,8 @@ Route::middleware('guest')->group(function (): void {
     Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
         ->name('register');
     Route::post('/register', [AuthController::class, 'register']);
+    Route::get('/register/agent-fee/callback', [AgentRegistrationFeeController::class, 'callback'])
+        ->name('register.agent-fee.callback');
 
     Route::get('/login', [AuthController::class, 'showLoginForm'])
         ->name('login');
