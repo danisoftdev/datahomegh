@@ -10,6 +10,7 @@ use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Services\WalletService;
 use App\Support\PaystackChargeMetadata;
+use App\Support\PaystackVerifyAmount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -137,7 +138,7 @@ class WalletController extends Controller
             }
         }
 
-        $amountGhs = $this->amountGhsFromPaystackData($data);
+        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
             $this->applyVerifiedPaystackCredit($userId, $reference, $amountGhs, $data);
@@ -183,7 +184,7 @@ class WalletController extends Controller
             return response()->json([], 200);
         }
 
-        $amountGhs = $this->amountGhsFromPaystackData($data);
+        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
             $this->applyVerifiedPaystackCredit($userId, $reference, $amountGhs, $data);
@@ -309,15 +310,5 @@ class WalletController extends Controller
                 ],
             );
         });
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function amountGhsFromPaystackData(array $data): string
-    {
-        $pesewas = (int) ($data['amount'] ?? 0);
-
-        return number_format($pesewas / 100, 2, '.', '');
     }
 }

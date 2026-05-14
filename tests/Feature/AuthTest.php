@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Notification;
+use App\Models\PaystackTransaction;
 use App\Models\PlatformSetting;
 use App\Models\Role;
 use App\Models\User;
@@ -204,6 +205,126 @@ class AuthTest extends TestCase
             'reference' => 'ref_agent_reg_meta_gap',
             'status' => 'success',
         ]);
+    }
+
+    public function test_agent_register_callback_accepts_one_pesewa_amount_difference_from_paystack(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_pesewa',
+                ],
+            ], 200),
+        ]);
+
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'pesewa_agent',
+            'name' => 'Pesewa Agent',
+            'email' => 'pesewa@example.com',
+            'phone' => '0244333888',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect('https://checkout.paystack.example/pay');
+
+        $agent = User::query()->where('username', 'pesewa_agent')->firstOrFail();
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_agent_reg_pesewa' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_agent_reg_pesewa',
+                    'amount' => 2499,
+                    'metadata' => [
+                        'user_id' => $agent->id,
+                        'type' => 'agent_shop_registration',
+                    ],
+                    'paid_at' => now()->toIso8601String(),
+                    'channel' => 'mobile_money',
+                ],
+            ], 200),
+        ]);
+
+        $this->withSession([
+            'agent_shop_registration' => [
+                'reference' => 'ref_agent_reg_pesewa',
+                'user_id' => $agent->id,
+            ],
+        ])->get(route('register.agent-fee.callback', ['reference' => 'ref_agent_reg_pesewa']))
+            ->assertRedirect(route('login'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame('pending', (string) $agent->fresh()->status);
+    }
+
+    public function test_agent_register_callback_reconciles_when_paystack_transaction_row_was_missing(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_reconcile',
+                ],
+            ], 200),
+        ]);
+
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'reconcile_agent',
+            'name' => 'Reconcile Agent',
+            'email' => 'reconcile@example.com',
+            'phone' => '0244333999',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect('https://checkout.paystack.example/pay');
+
+        $agent = User::query()->where('username', 'reconcile_agent')->firstOrFail();
+
+        PaystackTransaction::query()->where('reference', 'ref_agent_reg_reconcile')->delete();
+        $this->assertDatabaseMissing('paystack_transactions', ['reference' => 'ref_agent_reg_reconcile']);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_agent_reg_reconcile' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_agent_reg_reconcile',
+                    'amount' => 2500,
+                    'metadata' => [
+                        'user_id' => $agent->id,
+                        'type' => 'agent_shop_registration',
+                    ],
+                    'paid_at' => now()->toIso8601String(),
+                    'channel' => 'mobile_money',
+                ],
+            ], 200),
+        ]);
+
+        $this->withSession([
+            'agent_shop_registration' => [
+                'reference' => 'ref_agent_reg_reconcile',
+                'user_id' => $agent->id,
+            ],
+        ])->get(route('register.agent-fee.callback', ['reference' => 'ref_agent_reg_reconcile']))
+            ->assertRedirect(route('login'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_reg_reconcile',
+            'user_id' => $agent->id,
+            'status' => 'success',
+        ]);
+        $this->assertSame('pending', (string) $agent->fresh()->status);
     }
 
     public function test_agent_register_without_configured_fee_fails_validation(): void
