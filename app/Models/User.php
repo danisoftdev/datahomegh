@@ -158,6 +158,15 @@ class User extends Authenticatable
         return $this->role?->slug === Role::SLUG_BUYER;
     }
 
+    /**
+     * Buyers registered under an agent must not use supplier Paystack top-up;
+     * they fund via the agent (MoMo) and the agent credits this wallet.
+     */
+    public function fundsWalletViaAgent(): bool
+    {
+        return $this->isBuyer() && $this->agent_id !== null;
+    }
+
     private static function roleIdIsSupplier(?int $roleId): bool
     {
         if ($roleId === null) {

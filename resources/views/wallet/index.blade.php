@@ -21,16 +21,33 @@
                 @endif
                 <div class="mt-6 flex flex-wrap gap-3">
                     @if ($wallet !== null && ! $wallet->is_frozen && ! auth()->user()->wallet_frozen)
-                        <button type="button" onclick="document.getElementById('topup-panel')?.classList.toggle('hidden')" class="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-dark shadow-md hover:brightness-105">
-                            {{ __('Add funds') }}
-                        </button>
+                        @if (! empty($fundsViaAgent))
+                            <div class="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                                <p class="font-semibold text-amber-200">{{ __('Add funds through your agent') }}</p>
+                                <p class="mt-2 text-slate-200">{{ __('You are linked to :shop. Paystack top-up is turned off so payments go to your agent, not the platform.', ['shop' => $agentShopName ?? __('your agent')]) }}</p>
+                                <ol class="mt-3 list-decimal space-y-1 pl-5 text-slate-200">
+                                    <li>{{ __('Send mobile money to your agent’s number below.') }}</li>
+                                    <li>{{ __('Use your username as the payment reference:') }} <span class="font-mono font-bold text-white">{{ auth()->user()->username }}</span></li>
+                                    <li>{{ __('After they receive the money, they will credit your wallet from their dashboard.') }}</li>
+                                </ol>
+                                @if (! empty($agentMomoNumber))
+                                    <p class="mt-3 text-slate-300">{{ __('Agent MoMo number') }}: <span class="font-mono text-lg font-bold text-white">{{ $agentMomoNumber }}</span></p>
+                                @else
+                                    <p class="mt-3 text-slate-400">{{ __('Your agent has not published a MoMo number yet. Contact them for payment details.') }}</p>
+                                @endif
+                            </div>
+                        @else
+                            <button type="button" onclick="document.getElementById('topup-panel')?.classList.toggle('hidden')" class="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-dark shadow-md hover:brightness-105">
+                                {{ __('Add funds') }}
+                            </button>
+                        @endif
                     @endif
                     <a href="#ledger" class="rounded-xl border border-white/20 px-6 py-3 text-sm font-semibold text-slate-200 hover:bg-white/5">{{ __('View history') }}</a>
                 </div>
             </div>
         </div>
 
-        @if ($wallet !== null && ! $wallet->is_frozen && ! auth()->user()->wallet_frozen)
+        @if ($wallet !== null && ! $wallet->is_frozen && ! auth()->user()->wallet_frozen && empty($fundsViaAgent))
             <div id="topup-panel" class="hidden rounded-2xl border border-white/10 bg-navy/80 p-6 shadow-xl backdrop-blur-sm">
                 <h2 class="text-lg font-semibold text-white">{{ __('Top up via Paystack') }}</h2>
                 <p class="mt-1 text-sm text-slate-400">{{ __('Amount between 1 and 10,000 GHS.') }}</p>

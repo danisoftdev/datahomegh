@@ -83,6 +83,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('buyers', [AgentBuyerController::class, 'index'])->name('buyers.index');
         Route::get('buyers/{buyer}', [AgentBuyerController::class, 'show'])->name('buyers.show');
         Route::post('buyers/{buyer}/approve', [AgentBuyerController::class, 'approve'])->name('buyers.approve');
+        Route::post('buyers/{buyer}/wallet-credit', [AgentBuyerController::class, 'creditWallet'])->name('buyers.wallet-credit');
         Route::delete('buyers/{buyer}', [AgentBuyerController::class, 'destroy'])->name('buyers.destroy');
 
         Route::resource('bundles', AgentBundleController::class)->except(['show']);
