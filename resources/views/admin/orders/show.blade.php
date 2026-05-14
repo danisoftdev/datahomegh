@@ -13,12 +13,13 @@
             <dl class="grid gap-3 text-sm sm:grid-cols-2">
                 <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd class="font-medium text-white">{{ $order->status }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Amount') }}</dt><dd class="text-[#FFD700]">{{ number_format((float) $order->amount, 2) }} GHS</dd></div>
-                <div><dt class="text-slate-500">{{ __('Network') }}</dt><dd>{{ $order->network }}</dd></div>
+                <div><dt class="text-slate-500">{{ __('Network') }}</dt><dd>{{ $order->bundlePackage?->isMtnAfaRegistration() ? __('MTN AFA') : $order->network }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $order->phone_number }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Buyer') }}</dt><dd>{{ $order->user?->username }} (#{{ $order->user_id }})</dd></div>
                 <div><dt class="text-slate-500">{{ __('Agent') }}</dt><dd>{{ $order->agent?->username ?? '—' }}</dd></div>
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}</dd></div>
             </dl>
+            @include('orders.partials.afa-registration', ['order' => $order])
         </div>
 
         <div class="space-y-4">

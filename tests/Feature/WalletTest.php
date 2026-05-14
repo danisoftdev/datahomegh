@@ -89,6 +89,7 @@ class WalletTest extends TestCase
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
             'network' => 'MTN',
+            'package_kind' => 'data',
             'name' => 'Frozen test',
             'size_label' => '1GB',
             'internal_cost' => '5.00',
@@ -112,6 +113,7 @@ class WalletTest extends TestCase
         $buyer = User::factory()->create([
             'role_id' => $buyerRole->id,
             'status' => 'active',
+            'agent_id' => null,
         ]);
 
         Wallet::query()->create([
@@ -142,5 +144,53 @@ class WalletTest extends TestCase
         ], $raw)->assertOk();
 
         $this->assertSame('50.00', (string) $buyer->wallet->fresh()->balance);
+    }
+
+    public function test_paystack_webhook_does_not_credit_agent_linked_buyer(): void
+    {
+        config(['paystack.secret_key' => 'sk_test_secret']);
+
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'agent_id' => $agent->id,
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '0.00',
+            'is_frozen' => false,
+        ]);
+
+        $payload = [
+            'event' => 'charge.success',
+            'data' => [
+                'reference' => 'ref_webhook_agent_buyer',
+                'amount' => 5000,
+                'metadata' => [
+                    'user_id' => $buyer->id,
+                ],
+                'channel' => 'mobile_money',
+                'paid_at' => now()->toIso8601String(),
+            ],
+        ];
+
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+        $sig = hash_hmac('sha512', $raw, 'sk_test_secret');
+
+        $this->call('POST', route('wallet.paystack.webhook'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X-Paystack-Signature' => $sig,
+        ], $raw)->assertOk();
+
+        $this->assertSame('0.00', (string) $buyer->wallet->fresh()->balance);
     }
 }

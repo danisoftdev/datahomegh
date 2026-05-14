@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\WalletService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -14,6 +15,7 @@ class AgentBuyerController extends Controller
 {
     public function __construct(
         private readonly NotificationService $notificationService,
+        private readonly WalletService $walletService,
     ) {}
 
     public function index(Request $request): View
@@ -64,6 +66,43 @@ class AgentBuyerController extends Controller
         );
 
         return back()->with('status', __('Buyer approved.'));
+    }
+
+    public function creditWallet(Request $request, User $buyer): RedirectResponse
+    {
+        $this->assertAgentBuyer($request, $buyer);
+
+        abort_unless($buyer->status === 'active', 422);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:100000'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $agent = $request->user();
+        $ref = 'agent_credit_'.$buyer->id.'_'.str_replace('.', '', uniqid('', true));
+
+        $extra = trim((string) ($validated['note'] ?? ''));
+        $ledgerNote = $extra !== ''
+            ? __('Agent :agent — :note', ['agent' => $agent->username, 'note' => $extra])
+            : __('Credit from agent :agent', ['agent' => $agent->username]);
+
+        $this->walletService->credit(
+            $buyer->id,
+            $validated['amount'],
+            'AGENT_CREDIT',
+            $ref,
+            $ledgerNote,
+        );
+
+        $this->notificationService->notify(
+            $buyer->id,
+            'Wallet credited',
+            __('Your agent added :amount GHS to your wallet.', ['amount' => number_format((float) $validated['amount'], 2)]),
+            'wallet_agent_credit',
+        );
+
+        return back()->with('status', __('Buyer wallet credited.'));
     }
 
     /**

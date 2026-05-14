@@ -15,6 +15,7 @@
                 <tr>
                     <th class="px-3 py-2">#</th>
                     <th class="px-3 py-2">{{ __('Network') }}</th>
+                    <th class="px-3 py-2">{{ __('Type') }}</th>
                     <th class="px-3 py-2">{{ __('Name') }}</th>
                     <th class="px-3 py-2">{{ __('Stock') }}</th>
                     <th class="px-3 py-2">{{ __('Avail') }}</th>
@@ -26,6 +27,7 @@
                     <tr class="border-b border-white/5">
                         <td class="px-3 py-2">{{ $b->id }}</td>
                         <td class="px-3 py-2">{{ $b->network }}</td>
+                        <td class="px-3 py-2">{{ $b->isMtnAfaRegistration() ? __('MTN AFA') : __('Data') }}</td>
                         <td class="px-3 py-2">{{ $b->name }}</td>
                         <td class="px-3 py-2">{{ $b->stock_count }}</td>
                         <td class="px-3 py-2">{{ $b->is_available ? __('Yes') : __('No') }}</td>
@@ -41,7 +43,7 @@
                         </td>
                     </tr>
                     <tr class="border-b border-white/10 bg-black/20">
-                        <td colspan="6" class="px-3 py-2">
+                        <td colspan="7" class="px-3 py-2">
                             <form method="post" action="{{ route('agent.bundles.stock', $b) }}" class="flex flex-wrap items-center gap-2 text-xs">
                                 @csrf
                                 <label class="text-slate-500">{{ __('Set stock') }}</label>

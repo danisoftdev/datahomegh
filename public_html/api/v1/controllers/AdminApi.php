@@ -237,7 +237,7 @@ final class AdminApi
         $roles = [];
         foreach ($targetRoles as $r) {
             $r = (string) $r;
-            if (in_array($r, [ROLE_BUYER, ROLE_AGENT, ROLE_SUPPLIER], true)) {
+            if (in_array($r, [ROLE_BUYER, ROLE_AGENT], true)) {
                 $roles[] = $r;
             }
         }

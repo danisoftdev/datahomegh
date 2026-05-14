@@ -67,7 +67,7 @@
                             <td class="px-3 py-2"><input class="order-cb" type="checkbox" name="order_ids[]" value="{{ $o->id }}" /></td>
                             <td class="px-3 py-2 font-mono text-xs">{{ $o->id }}</td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ $o->created_at?->format('Y-m-d H:i') }}</td>
-                            <td class="px-3 py-2">{{ $o->user?->username }}</td>
+                            <td class="px-3 py-2">{{ (int) $o->user_id === (int) auth()->id() ? __('You') : $o->user?->username }}</td>
                             <td class="px-3 py-2">{{ $o->network }}</td>
                             <td class="px-3 py-2">{{ $o->phone_number }}</td>
                             <td class="px-3 py-2">{{ $o->status }}</td>

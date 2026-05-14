@@ -18,6 +18,26 @@
         </dl>
 
         <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
+            @if ($buyer->status === 'active')
+                <div class="w-full rounded-lg border border-white/10 bg-[#1A1A2E]/80 p-4">
+                    <h3 class="mb-2 text-sm font-medium text-emerald-300">{{ __('Credit buyer wallet') }}</h3>
+                    <p class="mb-3 text-xs text-slate-400">{{ __('After you receive mobile money from this buyer (they should use their username as the reference), record the amount here.') }}</p>
+                    <form method="post" action="{{ route('agent.buyers.wallet-credit', $buyer) }}" class="flex flex-wrap items-end gap-3">
+                        @csrf
+                        <div>
+                            <label for="credit_amount" class="mb-1 block text-xs text-slate-500">{{ __('Amount (GHS)') }}</label>
+                            <input id="credit_amount" name="amount" type="number" step="0.01" min="0.01" max="100000" required
+                                class="w-36 rounded-lg border border-white/10 bg-[#16213E] px-3 py-2 text-sm text-white" />
+                        </div>
+                        <div class="min-w-48 flex-1">
+                            <label for="credit_note" class="mb-1 block text-xs text-slate-500">{{ __('Note (optional)') }}</label>
+                            <input id="credit_note" name="note" type="text" maxlength="500"
+                                class="w-full rounded-lg border border-white/10 bg-[#16213E] px-3 py-2 text-sm text-white" placeholder="{{ __('e.g. MoMo ref from buyer') }}" />
+                        </div>
+                        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Credit wallet') }}</button>
+                    </form>
+                </div>
+            @endif
             @if ($buyer->status === 'pending')
                 <form method="post" action="{{ route('agent.buyers.approve', $buyer) }}">
                     @csrf

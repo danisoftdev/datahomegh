@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Notification;
+use App\Models\Role;
 use App\Models\User;
+use App\Notifications\BroadcastAnnouncementNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -22,7 +24,9 @@ class NotificationService
     }
 
     /**
-     * @param  list<string>  $roles  Role slugs; empty = everyone (single global broadcast row only).
+     * Broadcast in-app notifications and queue email copies for active buyers/agents with a valid email address.
+     *
+     * @param  list<string>  $roles  Role slugs (buyer, agent only). Empty = global broadcast row (suppliers do not see broadcast rows in-app).
      */
     public function broadcast(string $title, string $message, array $roles = [], string $type = 'broadcast'): void
     {
@@ -66,6 +70,55 @@ class NotificationService
                 Notification::query()->insert($chunk);
             }
         });
+
+        $this->dispatchBroadcastEmails($title, $message, $roles);
+    }
+
+    /**
+     * Queue a mail copy for buyers and/or agents who have a valid email (in addition to in-app rows).
+     *
+     * @param  list<string>  $roles  Same slugs passed to {@see broadcast()}; empty means global → mail buyers + agents.
+     */
+    private function dispatchBroadcastEmails(string $title, string $message, array $roles): void
+    {
+        $roleSlugs = $this->broadcastEmailRoleSlugs($roles);
+
+        if ($roleSlugs === []) {
+            return;
+        }
+
+        User::query()
+            ->where('status', 'active')
+            ->whereHas('role', fn ($q) => $q->whereIn('slug', $roleSlugs))
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->orderBy('id')
+            ->chunkById(100, function ($users) use ($title, $message): void {
+                foreach ($users as $user) {
+                    $email = trim((string) $user->email);
+                    if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        continue;
+                    }
+
+                    $user->notify(new BroadcastAnnouncementNotification($title, $message));
+                }
+            });
+    }
+
+    /**
+     * @param  list<string>  $roles
+     * @return list<string>
+     */
+    private function broadcastEmailRoleSlugs(array $roles): array
+    {
+        if ($roles === []) {
+            return [Role::SLUG_BUYER, Role::SLUG_AGENT];
+        }
+
+        return array_values(array_unique(array_intersect(
+            $roles,
+            [Role::SLUG_BUYER, Role::SLUG_AGENT],
+        )));
     }
 
     public function markRead(int $userId, ?string $roleSlug = null): void
@@ -108,5 +161,20 @@ class NotificationService
             ->count();
 
         return $personal + $broadcast;
+    }
+
+    /**
+     * Remove a notification. If it belongs to a broadcast group, delete every row in that group (template + per-user copies).
+     */
+    public function deleteByAdmin(Notification $notification): int
+    {
+        return (int) DB::transaction(function () use ($notification): int {
+            $gid = $notification->broadcast_group_id;
+            if ($gid !== null && $gid !== '') {
+                return Notification::query()->where('broadcast_group_id', $gid)->delete();
+            }
+
+            return Notification::query()->whereKey($notification->getKey())->delete();
+        });
     }
 }

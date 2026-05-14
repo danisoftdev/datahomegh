@@ -54,6 +54,10 @@ final class WalletApi
     public static function initTopup(PDO $pdo): void
     {
         $user = api_require_auth($pdo);
+        if (($user['role_slug'] ?? '') === 'buyer' && ! empty($user['agent_id'])) {
+            Response::error('Paystack top-up is not available for buyers linked to an agent. Pay your agent by mobile money; they will credit your wallet.', 422);
+        }
+
         $body = api_json_body();
         $amount = (float) ($body['amount'] ?? 0);
 
@@ -94,6 +98,10 @@ final class WalletApi
         $metaUid = api_paystack_metadata_user_id($data);
         if ($metaUid !== (int) $user['id']) {
             Response::error('Payment does not match this account', 403);
+        }
+
+        if (($user['role_slug'] ?? '') === 'buyer' && ! empty($user['agent_id'])) {
+            Response::error('Paystack top-up cannot be applied for buyers linked to an agent', 422);
         }
 
         $amountGhs = api_paystack_amount_ghs($data);

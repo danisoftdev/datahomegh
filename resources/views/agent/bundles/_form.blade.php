@@ -9,6 +9,14 @@
         </select>
     </div>
     <div>
+        <label class="mb-1 block text-sm text-slate-400">{{ __('Bundle type') }}</label>
+        <select name="package_kind" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white">
+            <option value="data" @selected(old('package_kind', $editing ? ($bundle->package_kind ?? 'data') : 'data') === 'data')>{{ __('Data bundle') }}</option>
+            <option value="mtn_afa" @selected(old('package_kind', $editing ? ($bundle->package_kind ?? 'data') : '') === 'mtn_afa')>{{ __('MTN AFA registration') }}</option>
+        </select>
+        <p class="mt-1 text-xs text-slate-500">{{ __('MTN AFA must use network MTN. Buyers submit registration details and pay your fee.') }}</p>
+    </div>
+    <div>
         <label class="mb-1 block text-sm text-slate-400">{{ __('Name') }}</label>
         <input type="text" name="name" required value="{{ old('name', $editing ? $bundle->name : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
     </div>

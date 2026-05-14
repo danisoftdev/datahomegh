@@ -29,4 +29,22 @@ final class BundleCatalog
 
         return $query->orderBy('network')->orderBy('name')->get();
     }
+
+    /**
+     * Bundles an agent may purchase for resale / fulfilment: their own catalogue plus supplier (platform) bundles.
+     *
+     * @return Collection<int, BundlePackage>
+     */
+    public static function forAgent(User $agent): Collection
+    {
+        return BundlePackage::query()
+            ->available()
+            ->where(function ($q) use ($agent): void {
+                $q->where('agent_id', $agent->id)
+                    ->orWhereNull('agent_id');
+            })
+            ->orderBy('network')
+            ->orderBy('name')
+            ->get();
+    }
 }

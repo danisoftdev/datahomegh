@@ -7,7 +7,9 @@ use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\OrderService;
+use App\Support\AfaRegistrationPayload;
 use App\Support\BundleCatalog;
+use App\Support\OrderCartItemsValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,13 +48,15 @@ class BuyerOrderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $networks = ['MTN', 'Telecel', 'AirtelTigo'];
+        $networks = ['MTN', 'Telecel', 'AirtelTigo', 'MTN_AFA'];
         $bundles = BundleCatalog::forBuyer($user);
 
         $bundlesJson = $bundles->map(function ($b) use ($user): array {
             return [
                 'id' => $b->id,
                 'network' => $b->network,
+                'package_kind' => $b->package_kind ?? 'data',
+                'order_network' => $b->isMtnAfaRegistration() ? 'MTN_AFA' : $b->network,
                 'name' => $b->name,
                 'size_label' => $b->size_label,
                 'price' => $this->orderService->priceForBuyer($user, $b),
@@ -64,6 +68,12 @@ class BuyerOrderController extends Controller
 
         return view('buyer.orders.create', [
             'networks' => $networks,
+            'networkLabels' => [
+                'MTN' => 'MTN',
+                'Telecel' => 'Telecel',
+                'AirtelTigo' => 'AirtelTigo',
+                'MTN_AFA' => __('MTN AFA'),
+            ],
             'bundlesJson' => $bundlesJson,
             'walletBalance' => $walletBalance,
         ]);
@@ -71,21 +81,50 @@ class BuyerOrderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'network' => ['required', Rule::in(['MTN', 'Telecel', 'AirtelTigo'])],
-            'phone_number' => ['required', 'string', 'regex:/^0[235]\d{8}$/'],
-            'bundle_package_id' => ['required', 'integer', 'exists:bundle_packages,id'],
-            'confirm' => ['accepted'],
-        ]);
+        $items = $request->input('items');
+        $useBatch = is_array($items) && count($items) > 0;
 
-        $bundle = BundleCatalog::forBuyer($request->user())->firstWhere('id', (int) $data['bundle_package_id']);
+        if ($useBatch) {
+            return $this->storeBatch($request);
+        }
+
+        $bundle = BundleCatalog::forBuyer($request->user())
+            ->firstWhere('id', (int) $request->input('bundle_package_id'));
 
         if ($bundle === null) {
             return back()->withInput()->withErrors(['bundle_package_id' => __('This bundle is not available for your account.')]);
         }
 
+        $allowedNetworks = $bundle->isMtnAfaRegistration()
+            ? ['MTN', 'MTN_AFA']
+            : ['MTN', 'Telecel', 'AirtelTigo'];
+
+        $rules = [
+            'network' => ['required', Rule::in($allowedNetworks)],
+            'phone_number' => ['required', 'string', 'regex:/^0[235]\d{8}$/'],
+            'bundle_package_id' => ['required', 'integer', 'exists:bundle_packages,id'],
+            'confirm' => ['accepted'],
+        ];
+
+        if ($bundle->isMtnAfaRegistration()) {
+            $rules['afa_registration'] = ['required', 'array'];
+            $rules = array_merge($rules, AfaRegistrationPayload::nestedRules());
+        }
+
+        $data = $request->validate($rules);
+
+        $networkForOrder = $data['network'] === 'MTN_AFA' ? 'MTN' : $data['network'];
+        $payload = [
+            'network' => $networkForOrder,
+            'phone_number' => $data['phone_number'],
+            'bundle_package_id' => (int) $data['bundle_package_id'],
+        ];
+        if ($bundle->isMtnAfaRegistration()) {
+            $payload['afa_registration'] = $data['afa_registration'];
+        }
+
         try {
-            $this->orderService->placeOrder($request->user()->id, $data);
+            $this->orderService->placeOrder($request->user()->id, $payload);
         } catch (InsufficientBalanceException $e) {
             return back()->withInput()->withErrors(['amount' => $e->getMessage()]);
         } catch (InvalidArgumentException $e) {
@@ -93,6 +132,34 @@ class BuyerOrderController extends Controller
         }
 
         return redirect()->route('buyer.orders.index')->with('status', __('Order placed.'));
+    }
+
+    private function storeBatch(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $result = OrderCartItemsValidator::validate($request, $user, BundleCatalog::forBuyer($user));
+
+        if (! $result['ok']) {
+            return back()->withInput()->withErrors($result['errors']);
+        }
+
+        $lines = $result['lines'];
+
+        try {
+            $orders = $this->orderService->placeOrders($user->id, $lines);
+        } catch (InsufficientBalanceException $e) {
+            return back()->withInput()->withErrors(['amount' => $e->getMessage()]);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['order' => $e->getMessage()]);
+        }
+
+        $message = $orders->count() > 1
+            ? __(':count orders placed.', ['count' => $orders->count()])
+            : __('Order placed.');
+
+        return redirect()->route('buyer.orders.index')->with('status', $message);
     }
 
     public function show(Request $request, Order $order): View
@@ -115,7 +182,7 @@ class BuyerOrderController extends Controller
 
     public function repeatLast(Request $request): JsonResponse
     {
-        $last = $request->user()->orders()->latest()->first();
+        $last = $request->user()->orders()->with('bundlePackage')->latest()->first();
 
         if ($last === null) {
             return response()->json([
@@ -129,7 +196,7 @@ class BuyerOrderController extends Controller
 
         return response()->json([
             'ok' => true,
-            'network' => $last->network,
+            'network' => $last->bundlePackage?->isMtnAfaRegistration() ? 'MTN_AFA' : $last->network,
             'phone_number' => $last->phone_number,
             'bundle_package_id' => $last->bundle_package_id,
             'bundle_id' => $last->bundle_package_id,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\InsufficientBalanceException;
 use App\Models\PaystackTransaction;
+use App\Models\User;
 use App\Models\WalletLedger;
 use App\Services\PaystackService;
 use App\Services\WalletService;
@@ -26,16 +27,25 @@ class WalletController extends Controller
 
     public function index(Request $request): View
     {
-        $user = $request->user()->loadMissing('wallet');
+        $user = $request->user()->loadMissing(['wallet', 'role', 'agent']);
 
         $ledger = WalletLedger::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
             ->paginate(15);
 
+        $fundsViaAgent = $user->fundsWalletViaAgent();
+        $agentMomoNumber = null;
+        if ($fundsViaAgent && $user->agent !== null) {
+            $agentMomoNumber = trim((string) ($user->agent->whatsapp_number ?: $user->agent->phone ?: '')) ?: null;
+        }
+
         return view('wallet.index', [
             'wallet' => $user->wallet,
             'ledger' => $ledger,
+            'fundsViaAgent' => $fundsViaAgent,
+            'agentMomoNumber' => $agentMomoNumber,
+            'agentShopName' => $user->agent?->shop_name ?? $user->agent?->name,
         ]);
     }
 
@@ -45,7 +55,13 @@ class WalletController extends Controller
             'amount' => ['required', 'numeric', 'min:1', 'max:10000'],
         ]);
 
-        $user = $request->user();
+        $user = $request->user()->loadMissing('role');
+
+        if ($user->fundsWalletViaAgent()) {
+            return back()->withErrors([
+                'amount' => __('Paystack top-up is not available for buyers linked to an agent. Send mobile money to your agent using the number on your wallet page, put your username in the reference, then your agent will credit your wallet.'),
+            ]);
+        }
 
         try {
             $init = $this->paystackService->initializePayment($user, (float) $data['amount']);
@@ -219,6 +235,17 @@ class WalletController extends Controller
      */
     private function applyVerifiedPaystackCredit(int $userId, string $reference, string $amountGhs, array $verifyData): void
     {
+        $target = User::query()->with('role')->find($userId);
+        if ($target !== null && $target->fundsWalletViaAgent()) {
+            Log::warning('paystack_wallet_credit_refused_agent_linked_buyer', [
+                'user_id' => $userId,
+                'reference' => $reference,
+                'amount_ghs' => $amountGhs,
+            ]);
+
+            return;
+        }
+
         DB::transaction(function () use ($userId, $reference, $amountGhs, $verifyData): void {
             $txn = PaystackTransaction::query()->where('reference', $reference)->lockForUpdate()->first();
 

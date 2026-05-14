@@ -17,6 +17,10 @@
     $registerUrl = url('/register?agent='.rawurlencode((string) $agent->shop_slug));
 @endphp
 
+@push('head')
+    @include('partials.favicon-links', ['href' => $logoUrl])
+@endpush
+
 @section('title', $shopTitle.' — Buy Data on DataHomeGH')
 @section('meta_description', $agent->business_description ? \Illuminate\Support\Str::limit(strip_tags($agent->business_description), 160) : __('Data bundles from :shop via DataHomeGH.', ['shop' => $shopTitle]))
 
@@ -64,15 +68,19 @@
                             @continue(!$bp)
                             @php
                                 $net = $bp->network;
-                                $badgeClass = match ($net) {
-                                    'MTN' => 'bg-yellow-500 text-[#1A1A2E]',
-                                    'Telecel' => 'bg-red-600 text-white',
-                                    'AirtelTigo' => 'bg-blue-600 text-white',
-                                    default => 'bg-slate-600 text-white',
-                                };
+                                $isAfa = $bp->isMtnAfaRegistration();
+                                $displayNet = $isAfa ? __('MTN AFA') : $net;
+                                $badgeClass = $isAfa
+                                    ? 'bg-amber-600 text-white'
+                                    : match ($net) {
+                                        'MTN' => 'bg-yellow-500 text-[#1A1A2E]',
+                                        'Telecel' => 'bg-red-600 text-white',
+                                        'AirtelTigo' => 'bg-blue-600 text-white',
+                                        default => 'bg-slate-600 text-white',
+                                    };
                             @endphp
                             <li class="flex flex-col rounded-xl border border-white/10 bg-[#16213E]/80 p-5 shadow-md backdrop-blur-sm">
-                                <span class="inline-flex w-fit rounded-md px-2.5 py-1 text-xs font-bold {{ $badgeClass }}">{{ $net }}</span>
+                                <span class="inline-flex w-fit rounded-md px-2.5 py-1 text-xs font-bold {{ $badgeClass }}">{{ $displayNet }}</span>
                                 <p class="mt-3 text-lg font-semibold text-white">{{ $bp->size_label }}</p>
                                 @if ($bp->name)
                                     <p class="mt-1 text-sm text-slate-400">{{ $bp->name }}</p>

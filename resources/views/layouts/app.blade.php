@@ -7,6 +7,8 @@
 
     <title>@yield('title', config('app.name'))</title>
 
+    @include('partials.favicon-links', ['href' => \App\Support\BrandingFavicon::urlForAppLayout(auth()->user())])
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
 
@@ -48,7 +50,8 @@
                         @if ($navVariant === 'agent')
                             @php($r = request())
                             <a href="{{ route('agent.dashboard') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.dashboard') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Dashboard') }}</a>
-                            <a href="{{ route('agent.orders.index') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.orders.*') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('My orders') }}</a>
+                            <a href="{{ route('agent.orders.create') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.orders.create') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('New order') }}</a>
+                            <a href="{{ route('agent.orders.index') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.orders.*') && ! $r->routeIs('agent.orders.create') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('My orders') }}</a>
                             <a href="{{ route('agent.buyers.index') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.buyers.*') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('My buyers') }}</a>
                             <a href="{{ route('agent.bundles.index') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('agent.bundles.*') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('My bundles') }}</a>
                             <a href="{{ route('wallet.index') }}" @click="mobileDrawer=false" class="{{ $r->routeIs('wallet.*') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Wallet') }}</a>

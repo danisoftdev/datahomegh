@@ -35,6 +35,8 @@ class BuyerController extends Controller
             return [
                 'id' => $b->id,
                 'network' => $b->network,
+                'package_kind' => $b->package_kind ?? 'data',
+                'order_network' => $b->isMtnAfaRegistration() ? 'MTN_AFA' : $b->network,
                 'name' => $b->name,
                 'size_label' => $b->size_label,
                 'price' => $this->orderService->priceForBuyer($user, $b),

@@ -73,7 +73,7 @@ class NotificationController extends Controller
             'message' => ['required', 'string', 'max:5000'],
             'type' => ['nullable', 'string', 'max:64'],
             'target_roles' => ['nullable', 'array'],
-            'target_roles.*' => ['string', Rule::in([Role::SLUG_BUYER, Role::SLUG_AGENT, Role::SLUG_SUPPLIER])],
+            'target_roles.*' => ['string', Rule::in([Role::SLUG_BUYER, Role::SLUG_AGENT])],
         ]);
 
         $roles = array_values(array_unique($validated['target_roles'] ?? []));
