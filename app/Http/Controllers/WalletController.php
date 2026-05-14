@@ -112,7 +112,7 @@ class WalletController extends Controller
             return redirect()->route('wallet.index')->withErrors(['paystack' => $e->getMessage()]);
         }
 
-        if (($data['status'] ?? '') !== 'success') {
+        if (strtolower((string) ($data['status'] ?? '')) !== 'success') {
             return redirect()->route('wallet.index')->withErrors(['paystack' => __('Payment was not successful.')]);
         }
 
@@ -170,7 +170,10 @@ class WalletController extends Controller
 
         $userId = (int) (PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
 
-        if ($userId <= 0) {
+        $txn = PaystackTransaction::query()->where('reference', $reference)->first();
+        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
+            $userId = (int) $txn->user_id;
+        } elseif ($userId <= 0) {
             return response()->json([], 200);
         }
 
@@ -238,9 +241,23 @@ class WalletController extends Controller
      */
     private function applyVerifiedPaystackCredit(int $userId, string $reference, string $amountGhs, array $verifyData): void
     {
+        $txn = PaystackTransaction::query()->where('reference', $reference)->first();
         $meta = PaystackChargeMetadata::fromChargeData($verifyData);
+
+        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
+            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment((int) $txn->user_id, $reference, $amountGhs, $verifyData);
+
+            return;
+        }
+
         if ($meta['type'] === 'agent_shop_registration') {
-            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $verifyData);
+            $uid = (int) ($meta['user_id'] ?? 0);
+            if ($uid <= 0) {
+                Log::warning('paystack_agent_registration_missing_user_id', ['reference' => $reference]);
+
+                return;
+            }
+            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($uid, $reference, $amountGhs, $verifyData);
 
             return;
         }

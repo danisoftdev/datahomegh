@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\BundlePackage;
+use App\Models\PaystackTransaction;
+use App\Models\PlatformSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
@@ -192,5 +194,68 @@ class WalletTest extends TestCase
         ], $raw)->assertOk();
 
         $this->assertSame('0.00', (string) $buyer->wallet->fresh()->balance);
+    }
+
+    public function test_paystack_webhook_completes_agent_shop_registration_when_metadata_omits_user_id(): void
+    {
+        config(['paystack.secret_key' => 'sk_test_secret']);
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'pending_payment',
+            'shop_slug' => 'Xy9z0',
+            'shop_name' => 'Pending Shop',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $agent->id,
+            'balance' => '0.00',
+            'is_frozen' => false,
+        ]);
+
+        PaystackTransaction::query()->create([
+            'user_id' => $agent->id,
+            'reference' => 'ref_agent_webhook_no_meta_uid',
+            'amount' => '25.00',
+            'status' => 'pending',
+            'channel' => null,
+            'paid_at' => null,
+            'metadata' => [
+                'kind' => 'agent_shop_registration',
+                'initialized_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        $payload = [
+            'event' => 'charge.success',
+            'data' => [
+                'reference' => 'ref_agent_webhook_no_meta_uid',
+                'amount' => 2500,
+                'metadata' => [],
+                'channel' => 'mobile_money',
+                'paid_at' => now()->toIso8601String(),
+            ],
+        ];
+
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+        $sig = hash_hmac('sha512', $raw, 'sk_test_secret');
+
+        $this->call('POST', route('wallet.paystack.webhook'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X-Paystack-Signature' => $sig,
+        ], $raw)->assertOk();
+
+        $this->assertSame('pending', (string) $agent->fresh()->status);
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_webhook_no_meta_uid',
+            'status' => 'success',
+        ]);
+        $this->assertFalse(WalletLedger::query()
+            ->where('user_id', $agent->id)
+            ->where('reference', 'ref_agent_webhook_no_meta_uid')
+            ->where('source', 'PAYSTACK')
+            ->exists());
     }
 }
