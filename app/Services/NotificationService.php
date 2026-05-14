@@ -2,28 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\FcmToken;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Kreait\Firebase\Contract\Messaging as MessagingContract;
-use Kreait\Firebase\Messaging\CloudMessage;
-use Kreait\Firebase\Messaging\Notification as FcmNotification;
-use Throwable;
 
 class NotificationService
 {
-    private const FCM_CHUNK = 500;
-
-    public function __construct(
-        private readonly MessagingContract $messaging,
-    ) {}
-
     public function notify(int $userId, string $title, string $message, string $type): Notification
     {
-        $notification = Notification::query()->create([
+        return Notification::query()->create([
             'user_id' => $userId,
             'title' => $title,
             'message' => $message,
@@ -31,22 +19,10 @@ class NotificationService
             'is_read' => false,
             'created_at' => now(),
         ]);
-
-        try {
-            $tokens = FcmToken::query()->where('user_id', $userId)->pluck('token')->all();
-            $this->sendFcmMulticastToTokens($tokens, $title, $message, $type);
-        } catch (Throwable $e) {
-            Log::warning('notification_fcm_failed', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return $notification;
     }
 
     /**
-     * @param  list<string>  $roles  Role slugs; empty = everyone (single global row + FCM to all token holders).
+     * @param  list<string>  $roles  Role slugs; empty = everyone (single global broadcast row only).
      */
     public function broadcast(string $title, string $message, array $roles = [], string $type = 'broadcast'): void
     {
@@ -90,27 +66,6 @@ class NotificationService
                 Notification::query()->insert($chunk);
             }
         });
-
-        $recipientUserIds = $roles === []
-            ? User::query()->pluck('id')->all()
-            : User::query()
-                ->whereHas('role', fn ($q) => $q->whereIn('slug', $roles))
-                ->pluck('id')
-                ->all();
-
-        try {
-            $tokens = FcmToken::query()
-                ->whereIn('user_id', $recipientUserIds)
-                ->pluck('token')
-                ->unique()
-                ->values()
-                ->all();
-            $this->sendFcmMulticastToTokens($tokens, $title, $message, $type);
-        } catch (Throwable $e) {
-            Log::warning('notification_broadcast_fcm_failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     public function markRead(int $userId, ?string $roleSlug = null): void
@@ -153,26 +108,5 @@ class NotificationService
             ->count();
 
         return $personal + $broadcast;
-    }
-
-    /**
-     * @param  list<string>  $tokens
-     */
-    private function sendFcmMulticastToTokens(array $tokens, string $title, string $body, string $type): void
-    {
-        $tokens = array_values(array_filter(array_unique($tokens)));
-        if ($tokens === []) {
-            return;
-        }
-
-        $message = CloudMessage::new()
-            ->withNotification(FcmNotification::create($title, $body))
-            ->withData([
-                'type' => $type,
-            ]);
-
-        foreach (array_chunk($tokens, self::FCM_CHUNK) as $chunk) {
-            $this->messaging->sendMulticast($message, $chunk);
-        }
     }
 }

@@ -1,7 +1,9 @@
-IMPORTANT RULES - DO NOT VIOLATE:
-1. Never add kreait/laravel-firebase or any Firebase package
-2. Never add Kreait\Firebase to any file
-3. Never add FCM push notifications
-4. Notifications use database only (MySQL)
-5. Never modify AppServiceProvider to inject Firebase
-6. Never add fcm.register route
+ABSOLUTE RULES - NEVER VIOLATE:
+- NEVER add kreait/laravel-firebase package
+- NEVER import Kreait\Firebase in any PHP file
+- NEVER modify AppServiceProvider to bind Firebase/Messaging
+- NEVER add FCM push notification code
+- Notifications use MySQL only via App\Services\NotificationService
+- NEVER add fcm.register or firebase routes
+
+The kreait/laravel-firebase package has been removed from this project permanently. Do NOT add it back under any circumstances. Do NOT modify AppServiceProvider to inject Firebase or Messaging. Do NOT add FCM push notifications. Notifications work via MySQL database only. If you need to send notifications use App\Services\NotificationService which uses the notifications table in MySQL. Never import Kreait\Firebase in any file.

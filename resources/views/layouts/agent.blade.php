@@ -77,6 +77,5 @@
             </main>
         </div>
     </div>
-    <x-fcm-init />
 </body>
 </html>
