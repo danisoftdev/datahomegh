@@ -7,12 +7,14 @@ use App\Mail\AgentAccountApprovedMail;
 use App\Models\PasswordResetCode;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AdminUserController extends Controller
@@ -54,6 +56,63 @@ class AdminUserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
         ]);
+    }
+
+    public function createAgent(): View
+    {
+        return view('admin.users.create-agent');
+    }
+
+    public function storeAgent(Request $request): RedirectResponse
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $validated = $request->validate([
+            'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')],
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class, 'email')],
+            'phone' => ['required', 'string', 'regex:/^0\d{9}$/'],
+            'shop_name' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = DB::transaction(function () use ($validated, $agentRole): User {
+            $slug = $this->uniqueShopSlug($validated['shop_name'], null);
+
+            $user = User::query()->create([
+                'username' => $validated['username'],
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'password' => $validated['password'],
+                'role_id' => $agentRole->id,
+                'agent_id' => null,
+                'shop_name' => $validated['shop_name'],
+                'shop_slug' => $slug,
+                'status' => 'active',
+            ]);
+
+            Wallet::query()->create([
+                'user_id' => $user->id,
+                'balance' => 0,
+                'is_frozen' => false,
+            ]);
+
+            return $user;
+        });
+
+        $this->notificationService->notify(
+            $user->id,
+            'Account ready',
+            'Your agent account is active. Your shop slug is '.$user->shop_slug.'.',
+            'account_approved',
+        );
+
+        Mail::to($user->email)->send(new AgentAccountApprovedMail($user, (string) $user->shop_slug));
+
+        return redirect()
+            ->route('admin.users.show', $user)
+            ->with('status', __('Agent account created. They can log in with the username and password you set.'));
     }
 
     public function show(User $user): View

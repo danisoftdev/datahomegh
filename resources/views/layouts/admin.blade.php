@@ -35,6 +35,7 @@
                     $r = request();
                     $shownUser = $r->route('user');
                     $agentsNav = ($r->routeIs('admin.users.index') && $r->get('role') === \App\Models\Role::SLUG_AGENT)
+                        || $r->routeIs('admin.users.create-agent')
                         || ($r->routeIs('admin.users.show') && $shownUser && $shownUser->role?->slug === \App\Models\Role::SLUG_AGENT);
                     $buyersNav = ($r->routeIs('admin.users.index') && $r->get('role') === \App\Models\Role::SLUG_BUYER)
                         || ($r->routeIs('admin.users.show') && $shownUser && $shownUser->role?->slug === \App\Models\Role::SLUG_BUYER);
