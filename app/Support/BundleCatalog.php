@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Collection;
 final class BundleCatalog
 {
     /**
-     * Active bundles a buyer may order: their agent’s bundles plus supplier (null agent) bundles when linked to an agent;
-     * supplier-only when the buyer has no agent.
+     * Active bundles a buyer may order: only their agent’s catalogue when linked to an agent;
+     * only supplier (platform) bundles when the buyer has no agent.
      *
      * @return Collection<int, BundlePackage>
      */
@@ -19,10 +19,7 @@ final class BundleCatalog
         $query = BundlePackage::query()->available();
 
         if ($buyer->agent_id !== null) {
-            $query->where(function ($q) use ($buyer): void {
-                $q->where('agent_id', $buyer->agent_id)
-                    ->orWhereNull('agent_id');
-            });
+            $query->where('agent_id', $buyer->agent_id);
         } else {
             $query->whereNull('agent_id');
         }

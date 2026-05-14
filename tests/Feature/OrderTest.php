@@ -9,6 +9,7 @@ use App\Models\RolePrice;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\OrderService;
+use App\Support\BundleCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -34,6 +35,20 @@ class OrderTest extends TestCase
             'size_label' => '1GB',
             'internal_cost' => '5.00',
             'stock_count' => 10,
+            'is_available' => true,
+        ]);
+    }
+
+    private function createAgentBundle(User $agent): BundlePackage
+    {
+        return BundlePackage::query()->create([
+            'agent_id' => $agent->id,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Agent catalogue bundle',
+            'size_label' => '2GB',
+            'internal_cost' => '8.00',
+            'stock_count' => 5,
             'is_available' => true,
         ]);
     }
@@ -153,7 +168,7 @@ class OrderTest extends TestCase
         ]);
 
         $bundle = BundlePackage::query()->create([
-            'agent_id' => null,
+            'agent_id' => $agent->id,
             'network' => 'MTN',
             'package_kind' => 'data',
             'name' => 'Agent Buyer Bundle',
@@ -462,5 +477,59 @@ class OrderTest extends TestCase
         ])->assertSessionHasErrors('order');
 
         $this->assertSame(0, Order::query()->where('user_id', $buyer->id)->count());
+    }
+
+    public function test_buyer_catalog_includes_only_agent_bundles_when_linked_to_agent(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agent = User::factory()->create(['role_id' => $agentRole->id, 'status' => 'active']);
+        $otherAgent = User::factory()->create(['role_id' => $agentRole->id, 'status' => 'active']);
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'agent_id' => $agent->id,
+        ]);
+
+        $platform = $this->createPlatformBundle();
+        $own = $this->createAgentBundle($agent);
+        $other = $this->createAgentBundle($otherAgent);
+
+        $ids = BundleCatalog::forBuyer($buyer)->pluck('id')->all();
+
+        $this->assertSame([$own->id], $ids);
+        $this->assertNotContains($platform->id, $ids);
+        $this->assertNotContains($other->id, $ids);
+    }
+
+    public function test_buyer_catalog_includes_only_platform_bundles_when_no_agent(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agent = User::factory()->create(['role_id' => $agentRole->id, 'status' => 'active']);
+        $buyer = User::factory()->create(['role_id' => $buyerRole->id, 'status' => 'active']);
+        $platform = $this->createPlatformBundle();
+        $agentBundle = $this->createAgentBundle($agent);
+
+        $ids = BundleCatalog::forBuyer($buyer)->pluck('id')->all();
+
+        $this->assertSame([$platform->id], $ids);
+        $this->assertNotContains($agentBundle->id, $ids);
+    }
+
+    public function test_buyer_linked_to_agent_rejected_when_ordering_platform_bundle(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $agent = User::factory()->create(['role_id' => $agentRole->id, 'status' => 'active']);
+        $buyer = $this->activeBuyerWithWallet('100.00');
+        $buyer->update(['agent_id' => $agent->id]);
+        $platform = $this->createPlatformBundle();
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $platform->id,
+            'confirm' => true,
+        ])->assertSessionHasErrors('bundle_package_id');
     }
 }

@@ -357,6 +357,18 @@ final class OrderApi
                 throw new RuntimeException('This bundle is not available or is out of stock.');
             }
 
+            $buyerAgentRaw = $u['agent_id'] ?? null;
+            $buyerAgentId = $buyerAgentRaw !== null && $buyerAgentRaw !== '' ? (int) $buyerAgentRaw : null;
+            $bundleAgentRaw = $bundle['agent_id'] ?? null;
+            $bundleAgentId = $bundleAgentRaw !== null && $bundleAgentRaw !== '' ? (int) $bundleAgentRaw : null;
+            if ($buyerAgentId !== null) {
+                if ($bundleAgentId !== $buyerAgentId) {
+                    throw new RuntimeException('This bundle is not available for your account.');
+                }
+            } elseif ($bundleAgentId !== null) {
+                throw new RuntimeException('This bundle is not available for your account.');
+            }
+
             if (($bundle['network'] ?? '') !== $network) {
                 throw new RuntimeException('Network does not match selected bundle.');
             }
