@@ -89,6 +89,10 @@
             @yield('content')
         </main>
 
+        <footer class="mx-auto w-full max-w-6xl shrink-0 border-t border-white/5 px-4 py-6 text-center text-xs text-slate-500 md:py-4">
+            @include('partials.developer-credit')
+        </footer>
+
         @if ($navVariant === 'buyer')
             <nav class="fixed bottom-0 left-0 right-0 z-40 flex border-t border-white/10 bg-navy/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="{{ __('Primary') }}">
                 @php($r = request())

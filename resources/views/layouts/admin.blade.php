@@ -91,6 +91,9 @@
 
                 @yield('content')
             </main>
+            <footer class="shrink-0 border-t border-white/10 px-4 py-3 text-center text-xs text-slate-500 lg:px-8">
+                @include('partials.developer-credit')
+            </footer>
         </div>
     </div>
 </body>

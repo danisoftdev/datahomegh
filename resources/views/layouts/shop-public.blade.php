@@ -14,6 +14,13 @@
     @endif
 </head>
 <body class="min-h-screen bg-[#1A1A2E] font-sans text-slate-200 antialiased">
-    @yield('content')
+    <div class="flex min-h-screen flex-col">
+        <div class="flex-1">
+            @yield('content')
+        </div>
+        <footer class="border-t border-white/10 px-4 py-6 text-center text-xs text-slate-500">
+            @include('partials.developer-credit')
+        </footer>
+    </div>
 </body>
 </html>

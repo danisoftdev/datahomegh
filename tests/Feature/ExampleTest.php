@@ -15,5 +15,7 @@ class ExampleTest extends TestCase
         $response = $this->get('/');
 
         $response->assertStatus(200);
+        $response->assertSee((string) config('app.name'), false);
+        $response->assertDontSee('Laravel has an incredibly rich ecosystem', false);
     }
 }
