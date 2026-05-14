@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Support\PaystackChargeMetadata;
+use App\Support\PaystackVerifyAmount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -79,7 +80,7 @@ class AgentRegistrationFeeController extends Controller
             ]);
         }
 
-        $amountGhs = $this->amountGhsFromPaystackData($data);
+        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
             $this->registrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $data);
@@ -102,15 +103,5 @@ class AgentRegistrationFeeController extends Controller
         return redirect()->route('login')
             ->with('status', __('Payment received. Your agent application is now awaiting approval. You will receive an email at :email when it is approved.', ['email' => $agent?->email ?? '—']))
             ->with('agent_reserved_code', $agent?->shop_slug);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function amountGhsFromPaystackData(array $data): string
-    {
-        $pesewas = (int) ($data['amount'] ?? 0);
-
-        return number_format($pesewas / 100, 2, '.', '');
     }
 }
