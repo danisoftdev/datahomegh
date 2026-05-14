@@ -6,6 +6,18 @@
     <div class="w-full max-w-md rounded-2xl border border-white/10 bg-[#16213E]/80 p-8 shadow-xl backdrop-blur-sm">
         <h1 class="mb-6 text-center text-2xl font-bold tracking-tight text-white">{{ __('Welcome back') }}</h1>
 
+        @if (session('status'))
+            <div class="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-center text-sm text-emerald-200">{{ session('status') }}</div>
+        @endif
+
+        @if (session('agent_reserved_code'))
+            <div class="mb-4 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-3 text-sm text-slate-200">
+                <p class="font-medium text-[#FFD700]">{{ __('Your shop code (save this)') }}</p>
+                <p class="mt-2 text-center font-mono text-xl tracking-widest text-white">{{ session('agent_reserved_code') }}</p>
+                <p class="mt-2 text-xs text-slate-400">{{ __('This code is assigned by the system and cannot be changed. You can log in after the supplier approves your agent account.') }}</p>
+            </div>
+        @endif
+
         <form method="post" action="{{ route('login') }}" class="space-y-5">
             @csrf
 

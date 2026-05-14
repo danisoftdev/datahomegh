@@ -147,7 +147,13 @@ class AdminUserController extends Controller
         $shopName = $user->shop_name ?: $user->name;
         abort_if(trim($shopName) === '', 422, 'Agent must have a shop name or display name before approval.');
 
-        $slug = $this->uniqueShopSlug($shopName, $user->id);
+        $slug = is_string($user->shop_slug) && $user->shop_slug !== ''
+            ? $user->shop_slug
+            : $this->uniqueShopSlug($shopName, $user->id);
+
+        if (User::query()->where('shop_slug', $slug)->where('id', '!=', $user->id)->exists()) {
+            return back()->with('error', __('This shop code is already taken. Contact support.'));
+        }
 
         $user->status = 'active';
         $user->shop_slug = $slug;
@@ -163,7 +169,7 @@ class AdminUserController extends Controller
             'account_approved',
         );
 
-        Mail::to($user->email)->send(new AgentAccountApprovedMail($user, $slug));
+        Mail::to($user->email)->send(new AgentAccountApprovedMail($user, (string) $user->shop_slug));
 
         return back()->with('status', __('Agent approved and notified by email.'));
     }

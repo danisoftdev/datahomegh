@@ -54,7 +54,7 @@
 
             @if (! $viaAgent)
                 <div id="buyer-agent-link-block">
-                    <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent shop code') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
+                    <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent shop code') }} <span class="text-slate-500">({{ __('optional — leave blank to buy from the supplier directly') }})</span></label>
                     <input id="agent_slug" name="agent_slug" value="{{ old('agent_slug') }}" type="text" autocomplete="off"
                         class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
                     @error('agent_slug')
@@ -65,13 +65,18 @@
                 <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
             @endif
 
-            <div id="agent-shop-block" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }}">
-                <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
-                <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
-                    class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
-                @error('shop_name')
-                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                @enderror
+            <div id="agent-shop-block" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} space-y-3">
+                <div>
+                    <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
+                    <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
+                        class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
+                    @error('shop_name')
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <p class="rounded-lg border border-white/10 bg-[#1A1A2E]/80 px-3 py-2 text-xs leading-relaxed text-slate-400">
+                    {{ __('Your shop code is 5 letters and numbers, generated automatically when you register. You cannot choose or change it. It will appear on the next screen after you submit.') }}
+                </p>
             </div>
 
             <div>
@@ -84,8 +89,12 @@
             </div>
 
             <div>
-                <label for="name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Full name') }}</label>
-                <input id="name" name="name" value="{{ old('name') }}" required autocomplete="name"
+                <label for="name" class="mb-1.5 block text-sm font-medium text-slate-300">
+                    {{ __('Full name') }}
+                    <span id="name-required-badge" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} text-amber-400">*</span>
+                    <span id="name-optional-hint" class="{{ $oldType === 'agent' && ! $viaAgent ? 'hidden' : '' }} text-slate-500">({{ __('optional — defaults to username') }})</span>
+                </label>
+                <input id="name" name="name" value="{{ old('name') }}" type="text" autocomplete="name"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
                 @error('name')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
@@ -156,10 +165,22 @@
                     var buyerLink = document.getElementById('buyer-agent-link-block');
                     var badge = document.getElementById('email-required-badge');
                     var hint = document.getElementById('email-optional-hint');
+                    var nameBadge = document.getElementById('name-required-badge');
+                    var nameHint = document.getElementById('name-optional-hint');
+                    var nameInput = document.getElementById('name');
                     if (shopBlock) shopBlock.classList.toggle('hidden', !agent);
                     if (buyerLink) buyerLink.classList.toggle('hidden', agent);
                     if (badge) badge.classList.toggle('hidden', !agent);
                     if (hint) hint.classList.toggle('hidden', agent);
+                    if (nameBadge) nameBadge.classList.toggle('hidden', !agent);
+                    if (nameHint) nameHint.classList.toggle('hidden', agent);
+                    if (nameInput) {
+                        if (agent) {
+                            nameInput.setAttribute('required', 'required');
+                        } else {
+                            nameInput.removeAttribute('required');
+                        }
+                    }
                 }
                 form.querySelectorAll('input[name="account_type"]').forEach(function (el) {
                     el.addEventListener('change', sync);

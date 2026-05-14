@@ -121,4 +121,45 @@ class AdminAgentApprovalTest extends TestCase
 
         $this->assertSame('declined', $pending->fresh()->status);
     }
+
+    public function test_approve_preserves_self_registered_shop_slug(): void
+    {
+        Mail::fake();
+
+        $supplierRole = Role::query()->where('slug', Role::SLUG_SUPPLIER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $supplier = User::factory()->create([
+            'role_id' => $supplierRole->id,
+            'username' => 'adminuser2',
+            'status' => 'active',
+        ]);
+
+        $reserved = 'K7mNp';
+
+        $pending = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'username' => 'pendingreserved',
+            'status' => 'pending',
+            'shop_name' => 'Reserved Slug Shop',
+            'shop_slug' => $reserved,
+            'email' => 'reserved-slug@example.com',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $pending->id,
+            'balance' => 0,
+            'is_frozen' => false,
+        ]);
+
+        $this->actingAs($supplier)->post(route('admin.users.approve-agent', $pending))->assertSessionHas('status');
+
+        $pending->refresh();
+        $this->assertSame('active', $pending->status);
+        $this->assertSame($reserved, $pending->shop_slug);
+
+        Mail::assertSent(AgentAccountApprovedMail::class, function (AgentAccountApprovedMail $mail) use ($reserved): bool {
+            return $mail->shopSlug === $reserved;
+        });
+    }
 }
