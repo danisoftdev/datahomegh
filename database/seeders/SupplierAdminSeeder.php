@@ -21,34 +21,31 @@ class SupplierAdminSeeder extends Seeder
             return;
         }
 
-        $plainPassword = 'Admin@12345';
-
-        $existingSupplier = User::query()
+        $anySupplier = User::query()
             ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
-            ->where(function ($q): void {
-                $q->where('username', 'superadmin')
-                    ->orWhere('email', 'admin@datahomegh.shop');
-            })
+            ->orderBy('id')
             ->first();
 
-        if ($existingSupplier !== null) {
-            if ($this->command) {
-                $this->command->warn('Supplier admin already exists — skipped creating user.');
-            }
-
+        if ($anySupplier !== null) {
             Wallet::query()->firstOrCreate(
-                ['user_id' => $existingSupplier->id],
+                ['user_id' => $anySupplier->id],
                 ['balance' => 0, 'is_frozen' => false]
             );
 
+            if ($this->command) {
+                $this->command->warn('A supplier account already exists — skipped creating another. Only one supplier is allowed.');
+            }
+
             return;
         }
+
+        $plainPassword = 'Admin@12345';
 
         $user = User::query()->where('username', 'superadmin')->first();
 
         if ($user !== null) {
             if ($this->command) {
-                $this->command->warn('User "superadmin" already exists — skipped creating user.');
+                $this->command->warn('User "superadmin" already exists but is not a supplier — skipped. Assign supplier role manually if needed.');
             }
 
             Wallet::query()->firstOrCreate(

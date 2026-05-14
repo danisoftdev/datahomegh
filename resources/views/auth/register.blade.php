@@ -10,10 +10,12 @@
                 ? $agent->logo
                 : \Illuminate\Support\Facades\Storage::disk('public')->url($agent->logo);
         }
+        $viaAgent = ! empty($agent);
+        $oldType = old('account_type', 'buyer');
     @endphp
 
     <div class="w-full max-w-md rounded-2xl border border-white/10 bg-[#16213E]/80 p-8 shadow-xl backdrop-blur-sm">
-        @if (! empty($agent))
+        @if ($viaAgent)
             <div class="mb-8 flex flex-col items-center text-center">
                 @if ($agentLogoUrl)
                     <img src="{{ $agentLogoUrl }}" alt="{{ $agent->shop_name ?? $agent->name }}" class="mb-4 h-20 w-20 rounded-xl border border-white/10 object-cover" />
@@ -25,13 +27,33 @@
 
         <h1 class="mb-6 text-center text-2xl font-bold tracking-tight text-white">{{ __('Create account') }}</h1>
 
-        <form method="post" action="{{ route('register') }}" class="space-y-5">
+        <form method="post" action="{{ route('register') }}" class="space-y-5" id="register-form">
             @csrf
 
-            @if (! empty($agent))
-                <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
+            @if ($viaAgent)
+                <input type="hidden" name="via_agent_shop" value="1" />
+                <input type="hidden" name="account_type" value="buyer" />
             @else
-                <div>
+                <fieldset class="space-y-2">
+                    <legend class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Account type') }}</legend>
+                    <div class="flex gap-4">
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                            <input type="radio" name="account_type" value="buyer" class="text-[#FFD700]" @checked($oldType === 'buyer') />
+                            {{ __('Buyer') }}
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+                            <input type="radio" name="account_type" value="agent" class="text-[#FFD700]" @checked($oldType === 'agent') />
+                            {{ __('Agent') }}
+                        </label>
+                    </div>
+                    @error('account_type')
+                        <p class="text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </fieldset>
+            @endif
+
+            @if (! $viaAgent)
+                <div id="buyer-agent-link-block">
                     <label for="agent_slug" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Agent shop code') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
                     <input id="agent_slug" name="agent_slug" value="{{ old('agent_slug') }}" type="text" autocomplete="off"
                         class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
@@ -39,7 +61,18 @@
                         <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
+            @else
+                <input type="hidden" name="agent_slug" value="{{ $agent->shop_slug }}" />
             @endif
+
+            <div id="agent-shop-block" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }}">
+                <label for="shop_name" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Shop / business name') }} <span class="text-amber-400">*</span></label>
+                <input id="shop_name" name="shop_name" value="{{ old('shop_name') }}" type="text" autocomplete="organization"
+                    class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
+                @error('shop_name')
+                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
 
             <div>
                 <label for="username" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Username') }}</label>
@@ -60,7 +93,11 @@
             </div>
 
             <div>
-                <label for="email" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Email') }} <span class="text-slate-500">({{ __('optional') }})</span></label>
+                <label for="email" class="mb-1.5 block text-sm font-medium text-slate-300">
+                    {{ __('Email') }}
+                    <span id="email-required-badge" class="{{ $oldType === 'agent' && ! $viaAgent ? '' : 'hidden' }} text-amber-400">*</span>
+                    <span id="email-optional-hint" class="{{ $oldType === 'agent' && ! $viaAgent ? 'hidden' : '' }} text-slate-500">({{ __('optional') }})</span>
+                </label>
                 <input id="email" name="email" value="{{ old('email') }}" type="email" autocomplete="email"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-4 py-2.5 text-white placeholder:text-slate-500 focus:border-[#FFD700]/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700]/30" />
                 @error('email')
@@ -103,4 +140,32 @@
             <a href="{{ route('login') }}" class="font-medium text-[#FFD700] hover:underline">{{ __('Log in') }}</a>
         </p>
     </div>
+
+    @if (! $viaAgent)
+        <script>
+            (function () {
+                var form = document.getElementById('register-form');
+                if (!form) return;
+                function isAgent() {
+                    var r = form.querySelector('input[name="account_type"]:checked');
+                    return r && r.value === 'agent';
+                }
+                function sync() {
+                    var agent = isAgent();
+                    var shopBlock = document.getElementById('agent-shop-block');
+                    var buyerLink = document.getElementById('buyer-agent-link-block');
+                    var badge = document.getElementById('email-required-badge');
+                    var hint = document.getElementById('email-optional-hint');
+                    if (shopBlock) shopBlock.classList.toggle('hidden', !agent);
+                    if (buyerLink) buyerLink.classList.toggle('hidden', agent);
+                    if (badge) badge.classList.toggle('hidden', !agent);
+                    if (hint) hint.classList.toggle('hidden', agent);
+                }
+                form.querySelectorAll('input[name="account_type"]').forEach(function (el) {
+                    el.addEventListener('change', sync);
+                });
+                sync();
+            })();
+        </script>
+    @endif
 @endsection

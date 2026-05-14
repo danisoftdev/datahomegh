@@ -10,12 +10,28 @@ This guide takes the project from a finished local branch to production on **Hos
 - Hostinger account with **hPanel**, **SSH**, and a domain (e.g. `datahomegh.shop`) pointed at Hostinger.
 - Local machine: **Node.js**, **PHP 8.2+**, **Composer**, **Git**.
 
-**Note on the REST API:** This repo includes a **pure PHP API** under `public_html/api/v1/` (document root–relative path `/api/v1/…`). Laravel’s web root is **`public/`**. For production with document root `~/datahomegh/public`, either:
+**Note on the REST API:** This repo includes a **pure PHP API** under `public_html/api/v1/` in the repo (path `/api/v1/…` from the web root). Laravel’s web root is **`public/`**. On the server, after **`public_html`** points at Laravel’s `public` (Part B.3 symlink), either:
 
-- Copy or symlink `public_html/api/v1` → `public/api/v1`, **or**
-- Deploy the API folder separately and map `/api/v1` in the panel.
+- Copy or symlink `public_html/api/v1` → `~/datahomegh/public/api/v1` (from the repo’s `public_html/api/v1`), **or**
+- Deploy the API folder separately.
 
 Ensure `.htaccess` inside `api/v1` rewrites to `index.php` if you rely on Apache. The **curl** in Part D assumes login is available at `https://datahomegh.shop/api/v1/auth/login` from that layout.
+
+---
+
+## Directory layout on Hostinger (correct vs wrong)
+
+**Correct (recommended):**
+
+| Path | Contents |
+|------|-----------|
+| `~/datahomegh/` | Full Laravel repo (`app/`, `routes/`, `vendor/`, `.env`, `storage/`, …) — **outside** the fixed web root |
+| `~/datahomegh/public/` | Laravel web root (`index.php`, `build/`, …) |
+| `~/domains/<domain>/public_html` **or** `~/public_html` | **Symlink** → `~/datahomegh/public` (Hostinger still “serves” `public_html`, but files are Laravel’s `public`) |
+
+**Wrong:** `git clone` **into** `public_html` so `app/`, `.env`, and `vendor/` are web-accessible — exposes the application and breaks updates.
+
+**Recovery:** If you already cloned or copied the full project into `public_html`, see **Recovery** at the end of this document.
 
 ---
 
@@ -81,17 +97,22 @@ Use these values in production `.env` as `DB_DATABASE`, `DB_USERNAME`, `DB_PASSW
    - `zip`
    - `gd`
    - `fileinfo`
+   - `tokenizer`
+   - `xml`
+   - `ctype`
 
 Save / apply.
 
-### 3. Document root
+### 3. Web root → Laravel `public` (Hostinger shared hosting)
 
-1. **hPanel → Domains** (or **Websites → Manage**).
-2. Set the site’s **document root** to the Laravel **`public`** directory, e.g.:
+On **Web / WordPress / Cloud** shared plans, Hostinger usually **fixes** the site directory to something like:
 
-   `~/datahomegh/public`
+- `/home/u123456789/domains/datahomegh.shop/public_html`, or  
+- `/home/u123456789/public_html`
 
-   Not the repo root — **must** be `public` so `index.php`, `.htaccess`, and `build/` assets are served correctly.
+The panel **often cannot change** that path to `~/datahomegh/public` (Hostinger documents this). After **Part C** has created `~/datahomegh` and `~/datahomegh/public/index.php`, use the **symbolic link** commands in **Part C (after `composer install`)** so `public_html` points at Laravel’s `public` folder.
+
+If `ln -sfn` fails, use **hPanel → Advanced → Fix File Ownership**, or ask Hostinger support to allow symlinks.
 
 ### 4. SSL
 
@@ -149,6 +170,36 @@ Install PHP dependencies (production, no dev packages):
 composer install --optimize-autoloader --no-dev
 ```
 
+### Link `public_html` → Laravel `public` (required on most Hostinger shared plans)
+
+Find which `public_html` your domain uses, then replace it with a symlink to `~/datahomegh/public`:
+
+```bash
+ls -la ~/domains/
+ls -la ~/domains/datahomegh.shop/ 2>/dev/null || true
+ls -la ~/public_html
+```
+
+**If** `~/domains/datahomegh.shop/public_html` **exists:**
+
+```bash
+cd ~/domains/datahomegh.shop
+mv public_html "public_html.bak.$(date +%Y%m%d)"
+ln -sfn ~/datahomegh/public public_html
+ls -la public_html
+```
+
+**Else if only** `~/public_html` **is used:**
+
+```bash
+cd ~
+mv public_html "public_html.bak.$(date +%Y%m%d)"
+ln -sfn ~/datahomegh/public public_html
+ls -la public_html
+```
+
+Use your real domain folder name under `domains/` if it differs from `datahomegh.shop`. See **Part B §3** for why this is needed.
+
 Environment file:
 
 ```bash
@@ -175,6 +226,16 @@ php artisan db:seed --class=SupplierAdminSeeder
 php artisan storage:link
 php artisan optimize
 ```
+
+**If `php artisan storage:link` fails** (Hostinger often disables `exec()` / `symlink()` from PHP CLI), create the link manually from the project root:
+
+```bash
+cd ~/datahomegh
+rm -rf public/storage
+ln -sfn "$(pwd)/storage/app/public" "$(pwd)/public/storage"
+```
+
+Then run **`php artisan optimize`** again if you skipped it above.
 
 **Native API:** If you serve it from `public/api/v1`, copy or link before or after `optimize`:
 
@@ -205,7 +266,7 @@ curl -sS -X POST "https://datahomegh.shop/api/v1/auth/login" \
 
 Expect **HTTP 200** and JSON containing at least a **Bearer token** (and user payload), e.g. `"token":"..."`.
 
-If you get **404**, check document root, API path under `public`, and rewrites. If **500**, check `storage/logs/laravel.log` and PHP error logs in hPanel.
+If you get **404**, check the **`public_html` → `~/datahomegh/public` symlink**, API path under `public`, and rewrites. If **500**, check `storage/logs/laravel.log` and PHP error logs in hPanel.
 
 ---
 
@@ -256,12 +317,109 @@ php artisan view:cache
 
 ---
 
+## Hostinger deployment checklist (canonical)
+
+Use this instead of any older step that says “set document root to `~/datahomegh/public`” in hPanel — on **shared Web hosting** Hostinger usually **cannot** change the web root; use the **`public_html` → symlink** flow in **Part C**.
+
+### 23.1 — hPanel pre-setup
+
+- Create **MySQL** database in hPanel → note `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` / `DB_HOST`.
+- **PHP 8.2+** in hPanel → **Advanced** → **PHP Configuration**.
+- Enable extensions: `pdo_mysql`, `mbstring`, `openssl`, `curl`, `zip`, `gd`, `fileinfo`, `tokenizer`, `xml`, `ctype`.
+- **Web root:** Do **not** put the Laravel repo inside `public_html`. Keep the app in **`~/datahomegh`**, then make **`public_html` a symlink** to **`~/datahomegh/public`** (see **Part C** after `composer install`). Hostinger still serves `public_html`; it resolves to Laravel’s `public`.
+- **SSL:** hPanel → SSL → Let’s Encrypt → `datahomegh.shop` + `www.datahomegh.shop` (optional).
+- **SSH:** hPanel → **Advanced** → **SSH Access** (note port, e.g. `65002`).
+- **Cron:** hPanel → **Advanced** → **Cron Jobs** — scheduler + queue worker (see **Part B §6**).
+
+### 23.2 — Code deployment (SSH)
+
+- `git clone` into **`~/datahomegh`** (repo root **next to** `public_html`, not inside it).
+- `composer install --optimize-autoloader --no-dev`
+- **Symlink** `public_html` → `~/datahomegh/public` (Part C — run after `composer install`).
+- `cp .env.example .env` → fill production values (see **23.3**).
+- `php artisan key:generate`
+- `php artisan migrate --force`
+- `php artisan db:seed --class=RolesAndPermissionsSeeder`
+- `php artisan db:seed --class=SupplierAdminSeeder`
+- `php artisan storage:link` (or manual `ln` if Artisan fails — Part C)
+- `php artisan optimize`
+- **Native API:** copy or symlink `public_html/api/v1` (from repo) → `~/datahomegh/public/api/v1` (Part C).
+
+### 23.3 — Production `.env` checklist
+
+- `APP_ENV=production`
+- `APP_DEBUG=false`
+- `APP_URL=https://datahomegh.shop`
+- `QUEUE_CONNECTION=database` (no Redis on typical shared hosting)
+- `CACHE_STORE=file` (Laravel 11+; legacy `CACHE_DRIVER=file` if your `.env` still uses it)
+- `SESSION_DRIVER=file` (unless you migrated a `sessions` table and prefer `database`)
+- `PAYSTACK_PUBLIC_KEY` / `PAYSTACK_SECRET_KEY` — test keys first, then live
+- `FIREBASE_CREDENTIALS=/home/u123456789/datahomegh/storage/app/firebase-credentials.json` (upload JSON via SFTP; path must exist on server)
+
+### 23.4 — Post-deploy verification
+
+- Visit `https://datahomegh.shop` — SSL padlock, site loads.
+- Change **superadmin** password immediately (seed default is dangerous).
+- Paystack: **test** end-to-end, then switch to **live** keys.
+- FCM browser push smoke test.
+- Flow: agent register → approve → shop link → buyer via link → order → admin status → refund.
+- Native API: `POST /api/v1/auth/login` returns JSON with token.
+- Wallet ledger: no ad-hoc `UPDATE`/`DELETE` on `wallet_ledger` (app + DB discipline).
+- hPanel **Backups** (weekly minimum).
+
+### 23.5 — Security hardening
+
+- `APP_DEBUG=false` in production.
+- Permissions: `storage/`, `bootstrap/cache/` writable by web user (often `755` or `775` per host); **`.env` → `600`**.
+- **Options -Indexes** in `.htaccess` (disable directory listing) where applicable.
+- CORS: production origins only (e.g. `https://datahomegh.shop`) — not `*` (see `config/cors.php` + native `API_CORS_ORIGIN`).
+- Enable **OPcache** in PHP configuration if available.
+- Paystack webhook: signature validation on before going live.
+
+---
+
+## Recovery: wrong layout (everything inside `public_html`)
+
+If you **cloned or uploaded the full Laravel repo into** `~/domains/.../public_html` (or `~/public_html`) so visitors could hit `app/`, `.env`, `vendor/`:
+
+1. **SSH** into the account.
+2. **Back up** the broken tree (keep a copy until the new site works):
+
+   ```bash
+   cd ~/domains/datahomegh.shop   # or: cd ~
+   mv public_html "public_html_full_repo_backup_$(date +%Y%m%d%H%M)"
+   ```
+
+3. **Clone clean** next to it (not inside web root):
+
+   ```bash
+   cd ~
+   git clone https://github.com/YOUR_ORG/datahomegh.git datahomegh
+   cd datahomegh
+   composer install --optimize-autoloader --no-dev
+   ```
+
+4. **Copy** your production `.env` from the backup into `~/datahomegh/.env` (or recreate from `.env.example`), then `php artisan key:generate` only if needed, `migrate`, etc.
+
+5. **Recreate** `public_html` as a **symlink** only:
+
+   ```bash
+   cd ~/domains/datahomegh.shop   # or: cd ~
+   ln -sfn ~/datahomegh/public public_html
+   ls -la public_html
+   ```
+
+6. **hPanel → Fix File Ownership** if permissions break.
+
+---
+
 ## Quick reference — URLs
 
 | Item | Example |
 |------|--------|
 | Site | `https://datahomegh.shop` |
-| Laravel `public` | `~/datahomegh/public` |
+| Laravel `public` (real files) | `~/datahomegh/public` |
+| Web root Hostinger serves | `public_html` → symlink → `~/datahomegh/public` (Part C, after `composer install`) |
 | API v1 (if under `public`) | `https://datahomegh.shop/api/v1/...` |
 
 ---
@@ -271,7 +429,7 @@ php artisan view:cache
 | Symptom | Things to check |
 |--------|------------------|
 | 500 / white screen | `APP_DEBUG` temporarily `true` in `.env` (revert after), `storage/logs/laravel.log`, PHP version & extensions |
-| 404 on all routes | Document root must be **`public/`**, `mod_rewrite` / `.htaccess` present |
+| 404 on all routes | **`public_html`** → symlink to **`~/datahomegh/public`** (Part C); `mod_rewrite` / `.htaccess` present |
 | DB connection errors | `DB_HOST`, credentials, user attached to DB with privileges |
 | Assets 404 | Run `npm run build`, commit `public/build`, or build on server; `APP_URL` must match HTTPS |
 | API 404 | API files under `public/api/v1` and Apache/nginx rules |

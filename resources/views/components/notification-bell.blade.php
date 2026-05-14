@@ -13,14 +13,18 @@
     };
 @endphp
 
-<div
-    class="relative shrink-0"
-    x-data="notificationBell(@json([
+@php
+    $__notificationBellConfig = [
         'unreadUrl' => route('notifications.unread-count'),
         'recentUrl' => route('notifications.recent'),
         'markReadUrl' => route('notifications.mark-read'),
         'pollMs' => 30000,
-    ]))"
+    ];
+@endphp
+
+<div
+    class="relative shrink-0"
+    x-data='notificationBell({{ json_encode($__notificationBellConfig) }})'
     @click.outside="open = false"
 >
     <button
@@ -45,7 +49,7 @@
         x-cloak
         x-transition
         @click.stop
-        class="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/10 bg-navy shadow-xl"
+        class="absolute right-0 z-50 mt-2 w-full max-w-sm overflow-hidden rounded-xl border border-white/10 bg-navy shadow-xl sm:w-80"
         style="display: none;"
     >
         <div class="flex items-center justify-between border-b border-white/10 px-3 py-2">

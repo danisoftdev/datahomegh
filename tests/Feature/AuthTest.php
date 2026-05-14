@@ -30,6 +30,8 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->from(route('register', ['agentSlug' => 'agent-shop']))->post(route('register'), [
+            'via_agent_shop' => '1',
+            'account_type' => 'buyer',
             'username' => 'newbuyer',
             'name' => 'New Buyer',
             'email' => 'newbuyer@example.com',
@@ -39,13 +41,66 @@ class AuthTest extends TestCase
             'agent_slug' => 'agent-shop',
         ]);
 
-        $response->assertRedirect(route('pending-approval'));
+        $response->assertRedirect(route('buyer.dashboard'));
 
         $this->assertDatabaseHas('users', [
             'username' => 'newbuyer',
-            'status' => 'pending',
+            'status' => 'active',
             'agent_id' => $agent->id,
         ]);
+
+        $this->assertAuthenticated();
+    }
+
+    public function test_buyer_register_without_agent_link_is_active_and_logged_in(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'buyer',
+            'username' => 'solo_buyer',
+            'name' => 'Solo Buyer',
+            'email' => 'solo@example.com',
+            'phone' => '0244222333',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertRedirect(route('buyer.dashboard'));
+
+        $this->assertDatabaseHas('users', [
+            'username' => 'solo_buyer',
+            'status' => 'active',
+        ]);
+        $this->assertAuthenticated();
+    }
+
+    public function test_agent_register_is_pending_and_redirects_to_login(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'newagent',
+            'name' => 'New Agent',
+            'email' => 'newagent@example.com',
+            'phone' => '0244333444',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect(route('login'));
+
+        $this->assertDatabaseHas('users', [
+            'username' => 'newagent',
+            'status' => 'pending',
+        ]);
+        $this->assertGuest();
+    }
+
+    public function test_agent_register_requires_email_and_shop_name(): void
+    {
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'badagent',
+            'name' => 'Bad Agent',
+            'phone' => '0244555666',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ])->assertSessionHasErrors(['email', 'shop_name']);
     }
 
     public function test_login_with_valid_credentials(): void
@@ -85,6 +140,25 @@ class AuthTest extends TestCase
 
         $response = $this->from(route('login'))->post(route('login'), [
             'username' => 'pendingbuyer',
+            'password' => 'SecretPass1!',
+        ]);
+
+        $response->assertSessionHasErrors('username');
+        $this->assertGuest();
+    }
+
+    public function test_login_fails_for_declined_agent(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        User::factory()->create([
+            'role_id' => $agentRole->id,
+            'username' => 'declinedagent',
+            'password' => 'SecretPass1!',
+            'status' => 'declined',
+        ]);
+
+        $response = $this->from(route('login'))->post(route('login'), [
+            'username' => 'declinedagent',
             'password' => 'SecretPass1!',
         ]);
 

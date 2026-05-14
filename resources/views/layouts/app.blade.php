@@ -28,7 +28,7 @@
     };
     $profileUrl = trim($__env->yieldContent('profile_url')) ?: match ($navVariant) {
         'agent' => route('agent.profile.edit'),
-        default => route('buyer.dashboard'),
+        default => route('buyer.profile.edit'),
     };
 @endphp
 <body class="min-h-screen bg-dark pb-20 font-sans text-slate-200 antialiased md:pb-0">
@@ -100,6 +100,10 @@
                 <a href="{{ route('buyer.orders.index') }}" class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium {{ $r->routeIs('buyer.orders.index') || ($r->routeIs('buyer.orders.*') && ! $r->routeIs('buyer.orders.create')) ? 'text-primary' : 'text-slate-400' }}">
                     <svg class="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     {{ __('Orders') }}
+                </a>
+                <a href="{{ route('buyer.profile.edit') }}" class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium {{ $r->routeIs('buyer.profile.*') ? 'text-primary' : 'text-slate-400' }}">
+                    <svg class="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    {{ __('Profile') }}
                 </a>
                 <a href="{{ route('wallet.index') }}" class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium {{ $r->routeIs('wallet.*') ? 'text-primary' : 'text-slate-400' }}">
                     <svg class="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>

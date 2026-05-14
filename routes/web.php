@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminBundleController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\AdminRoleController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Agent\AgentResalePlanController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\BuyerOrderController;
+use App\Http\Controllers\BuyerProfileController;
 use App\Http\Controllers\FcmController;
 use App\Http\Controllers\FirebaseWebConfigController;
 use App\Http\Controllers\NotificationController;
@@ -98,6 +100,11 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('role:'.Role::SLUG_AGENT)->get('/agent/dashboard', fn () => redirect()->route('agent.dashboard'));
 
+    Route::middleware(['auth', 'role:'.Role::SLUG_BUYER])->prefix('buyer')->name('buyer.')->group(function (): void {
+        Route::get('profile/edit', [BuyerProfileController::class, 'edit'])->name('profile.edit');
+        Route::match(['put', 'patch'], 'profile', [BuyerProfileController::class, 'update'])->name('profile.update');
+    });
+
     Route::middleware(['auth', 'role:'.Role::SLUG_BUYER, 'wallet'])->prefix('buyer')->name('buyer.')->group(function (): void {
         Route::get('/', [BuyerController::class, 'dashboard'])->name('dashboard');
 
@@ -127,6 +134,9 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('supplier')->prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
 
+        Route::get('profile/edit', [AdminProfileController::class, 'edit'])->name('profile.edit');
+        Route::match(['put', 'patch'], 'profile', [AdminProfileController::class, 'update'])->name('profile.update');
+
         Route::get('orders/export', [AdminOrderController::class, 'export'])->name('orders.export');
         Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
         Route::post('orders/bulk-update', [AdminOrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
@@ -137,6 +147,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
         Route::get('users/{user}', [AdminUserController::class, 'show'])->name('users.show');
         Route::post('users/{user}/approve-agent', [AdminUserController::class, 'approveAgent'])->name('users.approve-agent');
+        Route::post('users/{user}/decline-agent', [AdminUserController::class, 'declineAgent'])->name('users.decline-agent');
         Route::post('users/{user}/hold-agent', [AdminUserController::class, 'holdAgent'])->name('users.hold-agent');
         Route::post('users/{user}/release-agent', [AdminUserController::class, 'releaseAgent'])->name('users.release-agent');
         Route::delete('users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');

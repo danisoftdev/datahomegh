@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AgentAccountApprovedMail;
 use App\Models\PasswordResetCode;
 use App\Models\Role;
 use App\Models\User;
@@ -10,6 +11,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -42,6 +44,7 @@ class AdminUserController extends Controller
                 $q->where('username', 'like', $s)
                     ->orWhere('name', 'like', $s)
                     ->orWhere('phone', 'like', $s)
+                    ->orWhere('email', 'like', $s)
                     ->orWhere('shop_name', 'like', $s);
             });
         }
@@ -73,10 +76,14 @@ class AdminUserController extends Controller
         ]);
     }
 
-    public function approveAgent(Request $request, User $user): RedirectResponse
+    public function approveAgent(User $user): RedirectResponse
     {
         abort_unless($user->role?->slug === Role::SLUG_AGENT, 404);
         abort_unless($user->status === 'pending', 422);
+
+        if (! is_string($user->email) || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            return back()->with('error', __('This agent must have a valid email on file before you can approve them. An approval message is sent to that address.'));
+        }
 
         $shopName = $user->shop_name ?: $user->name;
         abort_if(trim($shopName) === '', 422, 'Agent must have a shop name or display name before approval.');
@@ -97,7 +104,20 @@ class AdminUserController extends Controller
             'account_approved',
         );
 
-        return back()->with('status', __('Agent approved.'));
+        Mail::to($user->email)->send(new AgentAccountApprovedMail($user, $slug));
+
+        return back()->with('status', __('Agent approved and notified by email.'));
+    }
+
+    public function declineAgent(User $user): RedirectResponse
+    {
+        abort_unless($user->role?->slug === Role::SLUG_AGENT, 404);
+        abort_unless($user->status === 'pending', 422);
+
+        $user->status = 'declined';
+        $user->save();
+
+        return back()->with('status', __('Agent application declined.'));
     }
 
     public function holdAgent(User $user): RedirectResponse

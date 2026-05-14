@@ -47,6 +47,7 @@
                 <a href="{{ route('admin.wallet.index') }}" class="{{ $r->routeIs('admin.wallet.*') ? 'bg-white/10 text-[#FFD700]' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Wallet controls') }}</a>
                 <a href="{{ route('admin.roles.index') }}" class="{{ $r->routeIs('admin.roles.*') ? 'bg-white/10 text-[#FFD700]' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Roles') }}</a>
                 <a href="{{ route('admin.notifications.index') }}" class="{{ $r->routeIs('admin.notifications.*') ? 'bg-white/10 text-[#FFD700]' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Notifications') }}</a>
+                <a href="{{ route('admin.profile.edit') }}" class="{{ $r->routeIs('admin.profile.*') ? 'bg-white/10 text-[#FFD700]' : 'text-slate-300 hover:bg-white/5' }} block rounded-lg px-3 py-2">{{ __('Account settings') }}</a>
             </nav>
             <div class="shrink-0 border-t border-white/10 p-3">
                 <form method="post" action="{{ route('logout') }}">

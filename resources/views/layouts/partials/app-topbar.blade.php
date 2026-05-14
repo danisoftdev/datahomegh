@@ -28,6 +28,7 @@
                 <a href="{{ route('buyer.orders.create') }}" class="{{ $r->routeIs('buyer.orders.create') ? 'bg-white/10 text-primary' : 'text-slate-300 hover:bg-white/5' }} rounded-lg px-3 py-2">{{ __('New order') }}</a>
                 <a href="{{ route('buyer.orders.index') }}" class="{{ $r->routeIs('buyer.orders.index') || ($r->routeIs('buyer.orders.*') && ! $r->routeIs('buyer.orders.create')) ? 'bg-white/10 text-primary' : 'text-slate-300 hover:bg-white/5' }} rounded-lg px-3 py-2">{{ __('Orders') }}</a>
                 <a href="{{ route('wallet.index') }}" class="{{ $r->routeIs('wallet.*') ? 'bg-white/10 text-primary' : 'text-slate-300 hover:bg-white/5' }} rounded-lg px-3 py-2">{{ __('Wallet') }}</a>
+                <a href="{{ route('buyer.profile.edit') }}" class="{{ $r->routeIs('buyer.profile.*') ? 'bg-white/10 text-primary' : 'text-slate-300 hover:bg-white/5' }} rounded-lg px-3 py-2">{{ __('Profile') }}</a>
             @elseif ($navVariant === 'agent')
                 @php($r = request())
                 <a href="{{ route('agent.dashboard') }}" class="{{ $r->routeIs('agent.dashboard') ? 'bg-white/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5' }} rounded-lg px-3 py-2">{{ __('Dashboard') }}</a>

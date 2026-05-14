@@ -12,11 +12,36 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use RuntimeException;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user): void {
+            if (self::roleIdIsSupplier($user->role_id) && self::supplierUserCount() >= 1) {
+                throw new RuntimeException('Only one supplier (superadmin) account is allowed.');
+            }
+        });
+
+        static::updating(function (User $user): void {
+            if (! $user->isDirty('role_id')) {
+                return;
+            }
+
+            if (! self::roleIdIsSupplier($user->role_id)) {
+                return;
+            }
+
+            $otherSuppliers = self::supplierUserCount(exceptUserId: $user->id);
+            if ($otherSuppliers >= 1) {
+                throw new RuntimeException('Only one supplier (superadmin) account is allowed.');
+            }
+        });
+    }
 
     protected $fillable = [
         'username',
@@ -136,5 +161,22 @@ class User extends Authenticatable
     public function isBuyer(): bool
     {
         return $this->role?->slug === Role::SLUG_BUYER;
+    }
+
+    private static function roleIdIsSupplier(?int $roleId): bool
+    {
+        if ($roleId === null) {
+            return false;
+        }
+
+        return Role::query()->where('id', $roleId)->where('slug', Role::SLUG_SUPPLIER)->exists();
+    }
+
+    private static function supplierUserCount(?int $exceptUserId = null): int
+    {
+        return User::query()
+            ->whereHas('role', fn (Builder $q) => $q->where('slug', Role::SLUG_SUPPLIER))
+            ->when($exceptUserId !== null, fn (Builder $q) => $q->where('id', '!=', $exceptUserId))
+            ->count();
     }
 }

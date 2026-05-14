@@ -14,7 +14,7 @@
         </select>
         <select name="status" class="rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white">
             <option value="">{{ __('Any status') }}</option>
-            @foreach (['pending', 'active', 'held', 'deleted'] as $st)
+            @foreach (['pending', 'active', 'held', 'declined', 'deleted'] as $st)
                 <option value="{{ $st }}" @selected(request('status') === $st)>{{ $st }}</option>
             @endforeach
         </select>
