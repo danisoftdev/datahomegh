@@ -33,12 +33,12 @@ Provide a structured, wallet-driven marketplace where agents operate branded sub
 | Layer | Technology | Notes |
 |--------|------------|--------|
 | Backend Framework | Laravel (PHP 8.2+) | MVC, Blade, Artisan |
-| API Layer | Native PHP 8.2 (RESTful JSON) | `public_html/api/v1/` — no Node.js |
+| API Layer | Native PHP 8.2 (RESTful JSON) | Repo path `public_html/api/v1/` → deploy to `public/api/v1/` on server |
 | Frontend | Blade + Alpine.js + Tailwind CSS | Mobile-first; build locally, commit assets |
 | Database | MySQL 8.x | Hostinger hPanel |
 | Payments | Paystack PHP SDK (Guzzle/cURL) | Card + Ghana MoMo top-ups |
 | Push Notifications | Firebase FCM (PHP Admin SDK) | In-app + browser push (service worker) |
-| File Storage | Local disk — `public_html/storage/` | Profile pics & logos |
+| File Storage | Local disk + `public/storage` → `storage/app/public` | Laravel `storage:link`; user uploads not directly under web root except via `public/storage` |
 | Authentication | Laravel Sanctum + PHP sessions | RBAC, CSRF, Bearer tokens for API |
 | Hosting | Hostinger Shared Hosting | Apache + `.htaccess`; SSL (Let’s Encrypt) |
 | Version Control | GitHub (Private) | Protected branches; GitHub Actions CI |
@@ -51,21 +51,21 @@ Provide a structured, wallet-driven marketplace where agents operate branded sub
 
 **CLIENT → APPLICATION → SERVICE → DATA**
 
-Browser/Mobile → Hostinger Apache (`public_html/`) → Laravel + Native PHP API → Paystack, FCM, SMTP → MySQL (Hostinger)
+Browser/Mobile → Hostinger Apache (`public_html` → symlink → Laravel `~/datahomegh/public`) → Laravel + native PHP API (under `public/api/v1` when deployed) → Paystack, FCM, SMTP → MySQL (Hostinger)
 
-**Hosting note:** The application lives on Hostinger Shared Hosting inside `public_html/`. Laravel’s `/public` maps to the Apache web root. The REST API is served via native PHP under `public_html/api/v1/` with `.htaccess` rewriting. No Node.js, Redis, or separate app server.
+**Hosting note (Hostinger shared):** The **full Laravel application** lives in **`~/datahomegh/`** (outside the fixed web directory). Hostinger’s **`public_html`** is a **symbolic link** to **`~/datahomegh/public`** so only Laravel’s front controller and assets are web-accessible. The native REST API ships in the repo under **`public_html/api/v1/`** (source tree); on the server, copy or symlink that folder to **`~/datahomegh/public/api/v1/`** so URLs like `/api/v1/...` resolve. Shared plans usually **cannot** change “document root” in hPanel; use the symlink pattern in **`docs/DEPLOYMENT.md`**. No Node.js or Redis on the server for typical shared hosting.
 
 #### 3.2 Application Layers
 
 | Layer | Components |
 |--------|------------|
-| Web root | `public_html/` → Laravel `public/`; `.htaccess` → `index.php` |
-| Routing | `web.php` + `api.php` (Laravel) + `public_html/api/v1/*.php` (native API) |
+| Web root | Hostinger `public_html` → **symlink** → `~/datahomegh/public` | Only `public/` is exposed; `.htaccess` → `index.php` |
+| Routing | `web.php` + `routes/api.php` (Laravel) + `public/api/v1/` (native API) | Native router: `index.php` + `.htaccess` |
 | Middleware | Auth, RoleCheck, WalletCheck, CSRF, ThrottleRequests |
 | Controllers | Auth, Order, Wallet, Bundle, Notification, Admin, Agent, Api |
 | Models | User, Role, Permission, Wallet, WalletLedger, Order, OrderHistory, Bundle, BundlePackage, Notification, PasswordResetCode, AgentShop (and related) |
 | Services | WalletService, OrderService, NotificationService, PaystackService, ReferralService |
-| Native PHP API | `public_html/api/v1/index.php` — lightweight router; JSON responses |
+| Native PHP API | Repo: `public_html/api/v1/` → server: `public/api/v1/` | Lightweight router; JSON responses |
 | Jobs / Queues | DB queue: SendNotificationJob, ProcessRefundJob |
 
 #### 3.3 URL Structure
