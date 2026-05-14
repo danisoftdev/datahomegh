@@ -68,6 +68,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
     Route::post('/notifications/mark-read', [NotificationController::class, 'markRead'])->name('notifications.mark-read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
     Route::middleware('supplier')->post('/notifications/admin-broadcast', [NotificationController::class, 'adminBroadcast'])
         ->name('notifications.admin-broadcast');

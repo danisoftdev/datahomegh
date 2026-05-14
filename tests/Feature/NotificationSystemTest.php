@@ -89,7 +89,7 @@ class NotificationSystemTest extends TestCase
         $this->assertSame(1, $buyerVisible);
     }
 
-    public function test_global_broadcast_emails_active_buyers_and_agents_with_valid_email(): void
+    public function test_global_broadcast_emails_buyers_and_agents_with_valid_email(): void
     {
         NotificationFacade::fake();
         $this->seed(RolesAndPermissionsSeeder::class);
@@ -113,6 +113,30 @@ class NotificationSystemTest extends TestCase
         NotificationFacade::assertSentTo($agent, BroadcastAnnouncementNotification::class);
     }
 
+    public function test_agent_targeted_broadcast_emails_pending_agents_with_valid_email(): void
+    {
+        NotificationFacade::fake();
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'email' => 'buyer-not-targeted@example.com',
+        ]);
+        $pendingAgent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'pending',
+            'email' => 'agent-pending@example.com',
+            'shop_slug' => 'shop-'.uniqid(),
+        ]);
+
+        app(NotificationService::class)->broadcast('Admin note', 'Please complete your profile', [Role::SLUG_AGENT], 'admin_broadcast');
+
+        NotificationFacade::assertNotSentTo($buyer, BroadcastAnnouncementNotification::class);
+        NotificationFacade::assertSentTo($pendingAgent, BroadcastAnnouncementNotification::class);
+    }
+
     public function test_broadcast_does_not_email_invalid_or_missing_addresses(): void
     {
         NotificationFacade::fake();
@@ -125,7 +149,7 @@ class NotificationSystemTest extends TestCase
         NotificationFacade::assertNothingSent();
     }
 
-    public function test_admin_can_delete_entire_broadcast_group(): void
+    public function test_admin_removing_broadcast_archives_template_and_keeps_recipient_rows(): void
     {
         NotificationFacade::fake();
         $this->seed(RolesAndPermissionsSeeder::class);
@@ -139,11 +163,63 @@ class NotificationSystemTest extends TestCase
 
         $this->assertGreaterThan(1, Notification::query()->count());
 
-        $any = Notification::query()->whereNotNull('broadcast_group_id')->firstOrFail();
-        $gid = $any->broadcast_group_id;
+        $template = Notification::query()
+            ->whereNull('user_id')
+            ->whereNotNull('broadcast_group_id')
+            ->firstOrFail();
+        $gid = $template->broadcast_group_id;
 
-        $this->actingAs($supplier)->delete(route('admin.notifications.destroy', $any))->assertRedirect();
+        $this->actingAs($supplier)->delete(route('admin.notifications.destroy', $template))->assertRedirect();
 
-        $this->assertSame(0, Notification::query()->where('broadcast_group_id', $gid)->count());
+        $this->assertGreaterThan(0, Notification::query()->where('broadcast_group_id', $gid)->count());
+        $this->assertNotNull($template->fresh()->admin_archived_at);
+    }
+
+    public function test_buyer_can_delete_own_broadcast_copy(): void
+    {
+        NotificationFacade::fake();
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $buyer = User::factory()->create(['role_id' => $buyerRole->id, 'status' => 'active']);
+
+        app(NotificationService::class)->broadcast('Hello', 'Body', [Role::SLUG_BUYER], 'x');
+
+        $copy = Notification::query()
+            ->where('user_id', $buyer->id)
+            ->whereNotNull('broadcast_group_id')
+            ->firstOrFail();
+
+        $this->actingAs($buyer)->delete(route('notifications.destroy', $copy))->assertRedirect();
+
+        $this->assertNull(Notification::query()->find($copy->id));
+    }
+
+    public function test_buyer_can_dismiss_global_broadcast_without_deleting_for_others(): void
+    {
+        NotificationFacade::fake();
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyer = User::factory()->create(['role_id' => $buyerRole->id, 'status' => 'active']);
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_slug' => 'shop-'.uniqid(),
+        ]);
+
+        app(NotificationService::class)->broadcast('All', 'Everyone', [], 'global');
+
+        $template = Notification::query()->whereNull('user_id')->whereNotNull('broadcast_group_id')->sole();
+
+        $this->actingAs($buyer)->delete(route('notifications.destroy', $template))->assertRedirect();
+
+        $this->assertNotNull(Notification::query()->find($template->id));
+        $this->assertDatabaseHas('notification_dismissals', [
+            'notification_id' => $template->id,
+            'user_id' => $buyer->id,
+        ]);
+
+        $this->assertSame(0, Notification::query()->forUser((int) $buyer->id, Role::SLUG_BUYER)->whereKey($template->id)->count());
+        $this->assertSame(1, Notification::query()->forUser((int) $agent->id, Role::SLUG_AGENT)->whereKey($template->id)->count());
     }
 }

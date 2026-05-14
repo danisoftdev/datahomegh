@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -64,6 +65,17 @@ class NotificationController extends Controller
         $this->notificationService->markRead((int) $user->id, $user->role?->slug);
 
         return response()->json(['ok' => true]);
+    }
+
+    public function destroy(Request $request, Notification $notification): RedirectResponse
+    {
+        $user = $request->user()->loadMissing('role');
+        $ok = $this->notificationService->dismissFromInbox((int) $user->id, $user->role?->slug, $notification);
+        if (! $ok) {
+            abort(403);
+        }
+
+        return back()->with('status', __('Notification removed.'));
     }
 
     public function adminBroadcast(Request $request): JsonResponse

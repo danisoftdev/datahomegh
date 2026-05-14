@@ -12,7 +12,7 @@
 
     <div class="mb-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
         <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Broadcast message') }}</h2>
-        <p class="mb-4 text-sm text-slate-400">{{ __('Leave all roles unchecked to send one global in-app notification to buyers and agents. Select roles to create per-user inbox rows for buyers and/or agents only. Recipients with a valid email on file also receive this message by email.') }}</p>
+        <p class="mb-4 text-sm text-slate-400">{{ __('Leave all roles unchecked to send one global in-app notification to buyers and agents. Select roles to create per-user inbox rows for buyers and/or agents only. Recipients with a valid email on file also receive this message by email. Removing a broadcast from this list only hides it here; buyers and agents keep their copies until they delete them from their own notifications.') }}</p>
         <form id="admin-broadcast-form" class="max-w-xl space-y-3">
             @csrf
             <div>
@@ -90,7 +90,7 @@
             <thead class="border-b border-white/10 text-xs uppercase text-slate-500">
                 <tr>
                     <th class="px-3 py-2">{{ __('When') }}</th>
-                    <th class="px-3 py-2">{{ __('Recipient') }}</th>
+                    <th class="px-3 py-2">{{ __('Audience') }}</th>
                     <th class="px-3 py-2">{{ __('Type') }}</th>
                     <th class="px-3 py-2">{{ __('Title') }}</th>
                     <th class="px-3 py-2 w-28"></th>
@@ -100,14 +100,20 @@
                 @foreach ($notifications as $n)
                     <tr class="border-b border-white/5">
                         <td class="px-3 py-2 whitespace-nowrap">{{ $n->created_at?->format('Y-m-d H:i') }}</td>
-                        <td class="px-3 py-2">{{ $n->user_id ? $n->user_id.' '.($n->user?->username ? '('.$n->user->username.')' : '') : __('All users') }}</td>
+                        <td class="px-3 py-2">
+                            @if ($n->user_id === null && $n->broadcast_group_id)
+                                {{ __('Broadcast') }}
+                            @else
+                                {{ $n->user_id }}@if ($n->user?->username) ({{ $n->user->username }}) @endif
+                            @endif
+                        </td>
                         <td class="px-3 py-2">{{ $n->type }}</td>
                         <td class="px-3 py-2">{{ $n->title }}</td>
                         <td class="px-3 py-2">
-                            <form method="post" action="{{ route('admin.notifications.destroy', $n) }}" class="inline" onsubmit="return confirm(@json(__('Delete this notification? If it is a broadcast, all copies for every recipient will be removed.')))">
+                            <form method="post" action="{{ route('admin.notifications.destroy', $n) }}" class="inline" onsubmit="return confirm(@json(__('Remove this from your admin list? Buyer and agent inboxes are not changed.')))">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="text-xs text-red-400 hover:text-red-300 hover:underline">{{ __('Delete') }}</button>
+                                <button type="submit" class="text-xs text-red-400 hover:text-red-300 hover:underline">{{ __('Remove') }}</button>
                             </form>
                         </td>
                     </tr>
