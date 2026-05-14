@@ -78,6 +78,7 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('profile/edit', [AgentProfileController::class, 'edit'])->name('profile.edit');
         Route::match(['put', 'patch'], 'profile', [AgentProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/close-account', [AgentProfileController::class, 'destroy'])->name('profile.destroy');
 
         Route::get('orders', [AgentOrderController::class, 'index'])->name('orders.index');
         Route::middleware('wallet')->group(function (): void {
@@ -107,6 +108,7 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware(['auth', 'role:'.Role::SLUG_BUYER])->prefix('buyer')->name('buyer.')->group(function (): void {
         Route::get('profile/edit', [BuyerProfileController::class, 'edit'])->name('profile.edit');
         Route::match(['put', 'patch'], 'profile', [BuyerProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/close-account', [BuyerProfileController::class, 'destroy'])->name('profile.destroy');
     });
 
     Route::middleware(['auth', 'role:'.Role::SLUG_BUYER, 'wallet'])->prefix('buyer')->name('buyer.')->group(function (): void {

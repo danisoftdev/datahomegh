@@ -6,6 +6,10 @@
 @section('content')
     <h1 class="mb-6 text-2xl font-bold text-white">{{ __('Your profile') }}</h1>
 
+    @if (session('status'))
+        <div class="mb-4 max-w-2xl rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">{{ session('status') }}</div>
+    @endif
+
     <form method="post" action="{{ route('agent.profile.update') }}" enctype="multipart/form-data" class="max-w-2xl space-y-8">
         @csrf
         @method('PUT')
@@ -87,4 +91,23 @@
 
         <button type="submit" class="rounded-lg bg-emerald-500 px-6 py-2 font-semibold text-[#0f0f1a]">{{ __('Save changes') }}</button>
     </form>
+
+    <div class="mt-8 max-w-2xl space-y-4 rounded-xl border border-red-500/30 bg-red-500/5 p-6">
+        <h2 class="text-lg font-semibold text-red-300">{{ __('Delete account') }}</h2>
+        <p class="text-sm text-slate-400">{{ __('This permanently removes your agent shop, bundles, wallet, and orders from this platform. Linked buyers are kept but detached from your shop. You can register again with the same username or email if you wish.') }}</p>
+        <form method="post" action="{{ route('agent.profile.destroy') }}" class="space-y-4" onsubmit="return confirm(@json(__('Permanently delete your account? This cannot be undone.')))">
+            @csrf
+            <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Current password') }}</label>
+                <input type="password" name="current_password" required autocomplete="current-password" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                @error('current_password')<p class="mt-1 text-sm text-red-400">{{ $message }}</p>@enderror
+            </div>
+            <label class="flex items-start gap-2 text-sm text-slate-300">
+                <input type="checkbox" name="delete_account" value="1" class="mt-1 rounded border-white/20 bg-[#1A1A2E]" />
+                <span>{{ __('I understand my account and related data will be permanently deleted.') }}</span>
+            </label>
+            @error('delete_account')<p class="text-sm text-red-400">{{ $message }}</p>@enderror
+            <button type="submit" class="rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/30">{{ __('Delete my account') }}</button>
+        </form>
+    </div>
 @endsection
