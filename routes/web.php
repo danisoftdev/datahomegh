@@ -162,6 +162,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('users/{user}/reset-code', [AdminUserController::class, 'issueResetCode'])->name('users.reset-code');
         Route::patch('users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
         Route::patch('users/{user}/daily-limit', [AdminUserController::class, 'setDailyLimit'])->name('users.daily-limit');
+        Route::post('users/{user}/wallet-credit', [AdminUserController::class, 'creditWallet'])->name('users.wallet-credit');
+        Route::post('users/{user}/wallet-debit', [AdminUserController::class, 'debitWallet'])->name('users.wallet-debit');
 
         Route::resource('bundles', AdminBundleController::class)->except(['show']);
         Route::post('bundles/{bundle}/stock', [AdminBundleController::class, 'updateStock'])->name('bundles.stock');

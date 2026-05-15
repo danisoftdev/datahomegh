@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\InsufficientBalanceException;
 use App\Http\Controllers\Controller;
 use App\Mail\AgentAccountApprovedMail;
 use App\Models\PasswordResetCode;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Services\NotificationService;
 use App\Services\UserAccountPurgeService;
+use App\Services\WalletService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,7 @@ class AdminUserController extends Controller
     public function __construct(
         private readonly NotificationService $notificationService,
         private readonly UserAccountPurgeService $userAccountPurgeService,
+        private readonly WalletService $walletService,
     ) {}
 
     public function index(Request $request): View
@@ -310,6 +313,104 @@ class AdminUserController extends Controller
         $user->save();
 
         return back()->with('status', __('Daily order limit saved.'));
+    }
+
+    public function creditWallet(Request $request, User $user): RedirectResponse
+    {
+        $this->assertWalletManageable($user);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:1000000'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $this->ensureWalletExists($user);
+
+        $admin = $request->user();
+        $ref = 'admin_credit_'.$user->id.'_'.str_replace('.', '', uniqid('', true));
+        $extra = trim((string) ($validated['note'] ?? ''));
+        $ledgerNote = $extra !== ''
+            ? __('Admin :admin — :note', ['admin' => $admin->username, 'note' => $extra])
+            : __('Credit from platform admin :admin', ['admin' => $admin->username]);
+
+        try {
+            $this->walletService->credit(
+                $user->id,
+                $validated['amount'],
+                'ADMIN_CREDIT',
+                $ref,
+                $ledgerNote,
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['amount' => $e->getMessage()]);
+        }
+
+        $this->notificationService->notify(
+            $user->id,
+            __('Wallet credited'),
+            __(':amount GHS was added to your wallet by the platform.', ['amount' => number_format((float) $validated['amount'], 2)]),
+            'wallet_admin_credit',
+        );
+
+        return back()->with('status', __('Wallet credited.'));
+    }
+
+    public function debitWallet(Request $request, User $user): RedirectResponse
+    {
+        $this->assertWalletManageable($user);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:1000000'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $this->ensureWalletExists($user);
+
+        $admin = $request->user();
+        $ref = 'admin_debit_'.$user->id.'_'.str_replace('.', '', uniqid('', true));
+        $extra = trim((string) ($validated['note'] ?? ''));
+        $ledgerNote = $extra !== ''
+            ? __('Admin :admin — :note', ['admin' => $admin->username, 'note' => $extra])
+            : __('Debit by platform admin :admin', ['admin' => $admin->username]);
+
+        try {
+            $this->walletService->debit(
+                $user->id,
+                $validated['amount'],
+                'ADMIN_DEBIT',
+                $ref,
+                $ledgerNote,
+            );
+        } catch (InsufficientBalanceException $e) {
+            return back()->withErrors(['amount' => $e->getMessage()]);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['amount' => $e->getMessage()]);
+        }
+
+        return back()->with('status', __('Wallet debited.'));
+    }
+
+    private function assertWalletManageable(User $user): void
+    {
+        abort_unless(
+            in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true),
+            404
+        );
+    }
+
+    private function ensureWalletExists(User $user): void
+    {
+        if ($user->wallet !== null) {
+            return;
+        }
+
+        Wallet::query()->create([
+            'user_id' => $user->id,
+            'balance' => 0,
+            'is_frozen' => false,
+        ]);
+
+        $user->load('wallet');
     }
 
     private function uniqueShopSlug(string $shopName, ?int $exceptUserId = null): string
