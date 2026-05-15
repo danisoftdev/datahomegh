@@ -10,6 +10,10 @@
         <a href="{{ route('admin.users.index', request()->only(['role', 'status', 'search'])) }}" class="text-sm text-[#FFD700] hover:underline">← {{ __('Users') }}</a>
     </div>
 
+    @if (session('status'))
+        <div class="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">{{ session('status') }}</div>
+    @endif
+
     @if (session('error'))
         <div class="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">{{ session('error') }}</div>
     @endif
@@ -46,8 +50,10 @@
                 <div><dt class="text-slate-500">{{ __('Shop name') }}</dt><dd>{{ $user->shop_name ?? '—' }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Shop slug') }}</dt><dd>{{ $user->shop_slug ?? '—' }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Daily order limit') }}</dt><dd>{{ $user->daily_order_limit ?? '∞' }}</dd></div>
-                <div><dt class="text-slate-500">{{ __('Wallet balance') }}</dt><dd>{{ $user->wallet ? number_format((float) $user->wallet->balance, 2) : '—' }} GHS</dd></div>
+                <div><dt class="text-slate-500">{{ __('Wallet balance') }}</dt><dd>{{ $user->wallet ? number_format((float) $user->wallet->balance, 2) : '—' }} GHS @if ($user->wallet?->is_frozen)<span class="text-amber-400">({{ __('frozen') }})</span>@endif</dd></div>
             </dl>
+
+            @include('admin.users.partials.wallet-load', ['user' => $user])
 
             <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending_payment')
