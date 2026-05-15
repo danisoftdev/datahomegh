@@ -572,4 +572,41 @@ class OrderTest extends TestCase
             'status' => 'PROCESSING',
         ])->assertNotFound();
     }
+
+    public function test_admin_and_agent_orders_index_show_package_column(): void
+    {
+        $supplier = $this->supplierUser();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_slug' => 'pkg-ag',
+        ]);
+        Wallet::query()->create([
+            'user_id' => $agent->id,
+            'balance' => '100.00',
+            'is_frozen' => false,
+        ]);
+
+        $bundle = $this->createPlatformBundle();
+
+        $this->actingAs($agent)->post(route('agent.orders.store'), [
+            'items' => [[
+                'network' => 'MTN',
+                'phone_number' => '0244999888',
+                'bundle_package_id' => $bundle->id,
+            ]],
+            'confirm' => true,
+        ])->assertRedirect();
+
+        $this->actingAs($supplier)->get(route('admin.orders.index'))
+            ->assertOk()
+            ->assertSeeText('Test Bundle')
+            ->assertSeeText('1GB');
+
+        $this->actingAs($agent)->get(route('agent.orders.index'))
+            ->assertOk()
+            ->assertSeeText('Test Bundle')
+            ->assertSeeText('1GB');
+    }
 }

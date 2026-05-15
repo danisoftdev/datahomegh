@@ -146,7 +146,7 @@ class AdminOrderController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, [
                 'id', 'created_at', 'status', 'network', 'phone_number', 'user_id', 'username',
-                'agent_id', 'bundle_package_id', 'bundle_name', 'amount',
+                'agent_id', 'bundle_package_id', 'bundle_name', 'bundle_size', 'amount',
             ]);
 
             $query->orderBy('id')->chunk(500, function ($orders) use ($out): void {
@@ -162,6 +162,7 @@ class AdminOrderController extends Controller
                         $o->agent_id,
                         $o->bundle_package_id,
                         $o->bundlePackage?->name,
+                        $o->bundlePackage?->size_label,
                         $o->amount,
                     ]);
                 }
