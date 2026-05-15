@@ -167,6 +167,129 @@ class User extends Authenticatable
         return $this->isBuyer() && $this->agent_id !== null;
     }
 
+    /**
+     * The single supplier (platform admin) account, if one exists.
+     */
+    public static function supplierUser(): ?User
+    {
+        return static::query()
+            ->whereHas('role', fn (Builder $q) => $q->where('slug', Role::SLUG_SUPPLIER))
+            ->first();
+    }
+
+    /**
+     * Actionable support links for dashboards (WhatsApp chat, channel URL, phone).
+     *
+     * @return array{whatsapp_chat: ?string, whatsapp_channel: ?string, telephone: ?string, whatsapp_label: ?string}
+     */
+    public function supportContactLinks(): array
+    {
+        $wa = self::whatsappMeUrlForNumber($this->whatsapp_number);
+
+        return [
+            'whatsapp_chat' => $wa['url'],
+            'whatsapp_channel' => self::normalizeHttpUrl($this->whatsapp_channel),
+            'telephone' => self::telephoneHref($this->phone),
+            'whatsapp_label' => $wa['label'],
+        ];
+    }
+
+    public function hasSupportContactContent(): bool
+    {
+        $links = $this->supportContactLinks();
+
+        return ($links['whatsapp_chat'] ?? null) !== null
+            || ($links['whatsapp_channel'] ?? null) !== null
+            || ($links['telephone'] ?? null) !== null;
+    }
+
+    /**
+     * Agent (or supplier) has configured WhatsApp chat and/or a channel link for shop support.
+     */
+    public function hasWhatsAppOrChannelForShop(): bool
+    {
+        return trim((string) $this->whatsapp_number) !== ''
+            || trim((string) $this->whatsapp_channel) !== '';
+    }
+
+    /**
+     * Contact card shown on the buyer dashboard: linked agent when they publish WhatsApp details, otherwise the platform supplier, then agent phone-only.
+     *
+     * @return array{user: ?User, heading: string}
+     */
+    public static function dashboardSupportForBuyer(User $buyer): array
+    {
+        $supplier = self::supplierUser();
+
+        if ($buyer->agent_id !== null) {
+            $buyer->loadMissing('agent');
+            $agent = $buyer->agent;
+            if ($agent instanceof self && $agent->hasWhatsAppOrChannelForShop()) {
+                return ['user' => $agent, 'heading' => __('Your agent & shop')];
+            }
+            if ($supplier instanceof self && $supplier->hasSupportContactContent()) {
+                return ['user' => $supplier, 'heading' => __('Platform support')];
+            }
+            if ($agent instanceof self && $agent->hasSupportContactContent()) {
+                return ['user' => $agent, 'heading' => __('Your agent & shop')];
+            }
+
+            return ['user' => null, 'heading' => ''];
+        }
+
+        if ($supplier instanceof self && $supplier->hasSupportContactContent()) {
+            return ['user' => $supplier, 'heading' => __('Platform support')];
+        }
+
+        return ['user' => null, 'heading' => ''];
+    }
+
+    /**
+     * @return array{url: ?string, label: ?string}
+     */
+    private static function whatsappMeUrlForNumber(?string $raw): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return ['url' => null, 'label' => null];
+        }
+
+        $label = trim($raw);
+        $digits = preg_replace('/\D+/', '', $label) ?? '';
+        if ($digits === '') {
+            return ['url' => null, 'label' => $label];
+        }
+
+        if (str_starts_with($digits, '0') && strlen($digits) >= 10) {
+            $digits = '233'.substr($digits, 1);
+        }
+
+        return ['url' => 'https://wa.me/'.$digits, 'label' => $label];
+    }
+
+    private static function normalizeHttpUrl(?string $raw): ?string
+    {
+        if ($raw === null || trim($raw) === '') {
+            return null;
+        }
+
+        $t = trim($raw);
+        if (! str_starts_with($t, 'http://') && ! str_starts_with($t, 'https://')) {
+            $t = 'https://'.$t;
+        }
+
+        return filter_var($t, FILTER_VALIDATE_URL) ? $t : null;
+    }
+
+    private static function telephoneHref(?string $phone): ?string
+    {
+        $phone = trim((string) $phone);
+        if ($phone === '') {
+            return null;
+        }
+
+        return 'tel:'.preg_replace('/\s+/', '', $phone);
+    }
+
     private static function roleIdIsSupplier(?int $roleId): bool
     {
         if ($roleId === null) {

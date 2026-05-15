@@ -43,10 +43,14 @@ class BuyerController extends Controller
             ];
         })->values()->all();
 
+        $support = User::dashboardSupportForBuyer($user);
+
         return view('buyer.dashboard', [
             'walletBalance' => $walletBalance,
             'recentOrders' => $recentOrders,
             'bundlesJson' => $bundlesJson,
+            'dashboardSupportContact' => $support['user'],
+            'dashboardSupportHeading' => $support['heading'],
         ]);
     }
 }

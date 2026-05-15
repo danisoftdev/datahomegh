@@ -54,7 +54,7 @@
 
         <div class="space-y-4 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
             <h2 class="text-lg font-semibold text-emerald-400">{{ __('Shop profile') }}</h2>
-            <p class="text-xs text-slate-500">{{ __('Shop slug and approval status are managed by the platform admin.') }}</p>
+            <p class="text-xs text-slate-500">{{ __('Shop slug and approval status are managed by the platform admin. WhatsApp and phone links you add here appear on your buyers’ dashboards when they are linked to your shop.') }}</p>
             <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('Shop name') }}</label>
                 <input type="text" name="shop_name" value="{{ old('shop_name', $user->shop_name) }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />

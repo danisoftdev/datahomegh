@@ -29,6 +29,10 @@
             </div>
         </div>
 
+        @if ($dashboardSupportContact)
+            <x-dashboard-contact-card :contact="$dashboardSupportContact" :heading="$dashboardSupportHeading" />
+        @endif
+
         <div>
             <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Recent orders') }}</h2>
             <div class="overflow-hidden rounded-xl border border-white/10 bg-[#16213E]/80">
