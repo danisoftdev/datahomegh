@@ -36,13 +36,14 @@ Route::get('/pending-approval', [AuthController::class, 'pendingApproval'])
     ->name('pending-approval');
 
 Route::middleware('guest')->group(function (): void {
-    Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
-        ->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
     Route::get('/register/agent-fee/confirm', [AgentRegistrationFeeController::class, 'showConfirmForm'])
         ->name('register.agent-fee.confirm-form');
     Route::match(['get', 'post'], '/register/agent-fee/callback', [AgentRegistrationFeeController::class, 'callback'])
         ->name('register.agent-fee.callback');
+
+    Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
+        ->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
 
     Route::get('/login', [AuthController::class, 'showLoginForm'])
         ->name('login');
