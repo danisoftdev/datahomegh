@@ -32,4 +32,20 @@ final class PaystackVerifyAmount
     {
         return self::ghsFromPesewas(self::pesewasFromVerifyData($verifyData));
     }
+
+    /**
+     * Registration fee: customer may pay slightly more than the listed fee (Paystack / channel surcharges).
+     * We require at least the configured fee and allow a generous upper bound — not wallet credit.
+     */
+    public static function registrationFeeMatches(int $expectedPesewas, int $paidPesewas): bool
+    {
+        if ($paidPesewas <= 0 || $expectedPesewas <= 0) {
+            return false;
+        }
+
+        $minAccepted = max(0, $expectedPesewas - 10);
+        $maxAccepted = (int) ceil($expectedPesewas * 1.25) + 100;
+
+        return $paidPesewas >= $minAccepted && $paidPesewas <= $maxAccepted;
+    }
 }

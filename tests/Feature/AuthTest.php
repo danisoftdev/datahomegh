@@ -263,6 +263,67 @@ class AuthTest extends TestCase
         $this->assertSame('pending', (string) $agent->fresh()->status);
     }
 
+    public function test_agent_register_callback_accepts_paystack_surcharge_above_listed_fee(): void
+    {
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.example/pay',
+                    'reference' => 'ref_agent_reg_surcharge',
+                ],
+            ], 200),
+        ]);
+
+        $this->post(route('register'), [
+            'account_type' => 'agent',
+            'username' => 'surcharge_agent',
+            'name' => 'Surcharge Agent',
+            'email' => 'surcharge@example.com',
+            'phone' => '0244333777',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'shop_name' => 'Agent Business',
+        ])->assertRedirect('https://checkout.paystack.example/pay');
+
+        $agent = User::query()->where('username', 'surcharge_agent')->firstOrFail();
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_agent_reg_surcharge' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_agent_reg_surcharge',
+                    'amount' => 3000,
+                    'metadata' => [
+                        'user_id' => $agent->id,
+                        'type' => 'agent_shop_registration',
+                    ],
+                    'paid_at' => now()->toIso8601String(),
+                    'channel' => 'mobile_money',
+                ],
+            ], 200),
+        ]);
+
+        $this->withSession([
+            'agent_shop_registration' => [
+                'reference' => 'ref_agent_reg_surcharge',
+                'user_id' => $agent->id,
+            ],
+        ])->get(route('register.agent-fee.callback', ['reference' => 'ref_agent_reg_surcharge']))
+            ->assertRedirect(route('login'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame('pending', (string) $agent->fresh()->status);
+        $this->assertDatabaseHas('paystack_transactions', [
+            'reference' => 'ref_agent_reg_surcharge',
+            'status' => 'success',
+            'amount' => '30.00',
+        ]);
+    }
+
     public function test_agent_register_callback_reconciles_when_paystack_transaction_row_was_missing(): void
     {
         PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');

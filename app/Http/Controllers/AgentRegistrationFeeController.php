@@ -7,9 +7,11 @@ use App\Models\User;
 use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Support\PaystackChargeMetadata;
+use App\Support\PaystackPaymentPurpose;
 use App\Support\PaystackVerifyAmount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -20,6 +22,11 @@ class AgentRegistrationFeeController extends Controller
         private readonly PaystackService $paystackService,
         private readonly AgentShopRegistrationPaymentService $registrationPaymentService,
     ) {}
+
+    public function showConfirmForm(): View
+    {
+        return view('auth.confirm-agent-registration-payment');
+    }
 
     public function callback(Request $request): RedirectResponse
     {
@@ -55,17 +62,15 @@ class AgentRegistrationFeeController extends Controller
             ]);
         }
 
-        $meta = PaystackChargeMetadata::fromChargeData($data);
-        $userId = (int) ($meta['user_id'] ?? 0);
-        $type = $meta['type'];
-
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
-        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
-            $userId = (int) $txn->user_id;
-            $type = 'agent_shop_registration';
-        }
 
-        if ($userId <= 0 || $type !== 'agent_shop_registration') {
+        $meta = PaystackChargeMetadata::fromChargeData($data);
+        $userId = (int) ($txn?->user_id ?? $meta['user_id'] ?? 0);
+        $isRegistration = $txn !== null
+            && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION;
+        $isRegistration = $isRegistration || $meta['type'] === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION;
+
+        if ($userId <= 0 || ! $isRegistration) {
             return redirect()->route('login')->withErrors([
                 'username' => __('This payment could not be linked to an agent registration.'),
             ]);

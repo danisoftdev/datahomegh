@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Services\PaystackService;
 use App\Support\AgentRegistrationShopCode;
+use App\Support\PaystackPaymentPurpose;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -204,7 +205,7 @@ class AuthController extends Controller
                     'channel' => null,
                     'paid_at' => null,
                     'metadata' => [
-                        'kind' => 'agent_shop_registration',
+                        'kind' => PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION,
                         'initialized_at' => now()->toIso8601String(),
                     ],
                 ],

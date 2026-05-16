@@ -39,6 +39,8 @@ Route::middleware('guest')->group(function (): void {
     Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
         ->name('register');
     Route::post('/register', [AuthController::class, 'register']);
+    Route::get('/register/agent-fee/confirm', [AgentRegistrationFeeController::class, 'showConfirmForm'])
+        ->name('register.agent-fee.confirm-form');
     Route::match(['get', 'post'], '/register/agent-fee/callback', [AgentRegistrationFeeController::class, 'callback'])
         ->name('register.agent-fee.callback');
 
@@ -62,6 +64,9 @@ Route::post('/logout', [AuthController::class, 'logout'])
 
 Route::post('/wallet/paystack/webhook', [WalletController::class, 'webhook'])
     ->name('wallet.paystack.webhook');
+
+Route::match(['get', 'post'], '/wallet/topup/callback', [WalletController::class, 'callback'])
+    ->name('wallet.topup.callback');
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -131,7 +136,6 @@ Route::middleware('auth')->group(function (): void {
 
     Route::prefix('wallet')->name('wallet.')->group(function (): void {
         Route::get('/', [WalletController::class, 'index'])->name('index');
-        Route::match(['get', 'post'], '/topup/callback', [WalletController::class, 'callback'])->name('topup.callback');
         Route::middleware('wallet')->group(function (): void {
             Route::post('/topup', [WalletController::class, 'initializeTopup'])->name('topup.initialize');
         });
@@ -164,6 +168,8 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('users/{user}/daily-limit', [AdminUserController::class, 'setDailyLimit'])->name('users.daily-limit');
         Route::post('users/{user}/wallet-credit', [AdminUserController::class, 'creditWallet'])->name('users.wallet-credit');
         Route::post('users/{user}/wallet-debit', [AdminUserController::class, 'debitWallet'])->name('users.wallet-debit');
+        Route::post('users/{user}/confirm-registration-payment', [AdminUserController::class, 'confirmRegistrationPayment'])
+            ->name('users.confirm-registration-payment');
 
         Route::resource('bundles', AdminBundleController::class)->except(['show']);
         Route::post('bundles/{bundle}/stock', [AdminBundleController::class, 'updateStock'])->name('bundles.stock');

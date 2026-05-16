@@ -53,11 +53,56 @@
                 <div><dt class="text-slate-500">{{ __('Wallet balance') }}</dt><dd>{{ $user->wallet ? number_format((float) $user->wallet->balance, 2) : '—' }} GHS @if ($user->wallet?->is_frozen)<span class="text-amber-400">({{ __('frozen') }})</span>@endif</dd></div>
             </dl>
 
+            @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT)
+                <div class="mt-6 rounded-lg border border-white/10 bg-[#1A1A2E]/60 p-4">
+                    <h3 class="text-sm font-semibold text-[#FFD700]">{{ __('Shop registration payment (Paystack)') }}</h3>
+                    <p class="mt-1 text-xs text-slate-400">{{ __('Fee goes to your Paystack business account — not the agent wallet. Confirmation uses the return link after payment (no Paystack dashboard webhook required).') }}</p>
+                    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div><dt class="text-slate-500">{{ __('Payment status') }}</dt>
+                            <dd>
+                                @if ($registrationTransaction?->status === 'success')
+                                    <span class="text-emerald-400">{{ __('Paid') }}</span>
+                                    @if ($registrationTransaction->paid_at)
+                                        <span class="text-slate-400"> · {{ $registrationTransaction->paid_at->format('Y-m-d H:i') }}</span>
+                                    @endif
+                                @elseif ($registrationTransaction)
+                                    <span class="text-amber-300">{{ ucfirst($registrationTransaction->status) }}</span>
+                                @else
+                                    <span class="text-slate-400">{{ __('No transaction record yet') }}</span>
+                                @endif
+                            </dd>
+                        </div>
+                        @if ($registrationTransaction?->reference)
+                            <div><dt class="text-slate-500">{{ __('Paystack reference') }}</dt><dd class="font-mono text-xs">{{ $registrationTransaction->reference }}</dd></div>
+                        @endif
+                        @if ($registrationTransaction?->amount)
+                            <div><dt class="text-slate-500">{{ __('Amount recorded') }}</dt><dd>{{ number_format((float) $registrationTransaction->amount, 2) }} GHS</dd></div>
+                        @endif
+                    </dl>
+                    @if (in_array($user->status, ['pending_payment', 'pending'], true) && $registrationTransaction?->status !== 'success')
+                        <form method="post" action="{{ route('admin.users.confirm-registration-payment', $user) }}" class="mt-4 flex flex-wrap items-end gap-3">
+                            @csrf
+                            <div class="min-w-48 flex-1">
+                                <label class="mb-1 block text-xs text-slate-500">{{ __('Paystack reference (optional)') }}</label>
+                                <input type="text" name="reference" value="{{ $registrationTransaction?->reference }}"
+                                    placeholder="{{ __('From agent receipt') }}"
+                                    class="w-full rounded-lg border border-white/10 bg-[#16213E] px-3 py-2 text-sm text-white" />
+                            </div>
+                            <button type="submit" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E]">
+                                {{ __('Verify payment with Paystack') }}
+                            </button>
+                        </form>
+                    @elseif ($user->status === 'pending')
+                        <p class="mt-3 text-xs text-emerald-300">{{ __('Registration fee received — you can approve this agent below.') }}</p>
+                    @endif
+                </div>
+            @endif
+
             @include('admin.users.partials.wallet-load', ['user' => $user])
 
             <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && $user->status === 'pending_payment')
-                    <p class="mb-2 w-full text-xs text-amber-200">{{ __('Awaiting registration fee on Paystack. Approve is available only after status becomes pending (payment confirmed). You may still decline this application.') }}</p>
+                    <p class="mb-2 w-full text-xs text-amber-200">{{ __('Waiting for Paystack to confirm the registration fee. If the agent already paid, use “Verify payment with Paystack” above or ask them to open the return link from Paystack.') }}</p>
                 @endif
                 @if ($user->role?->slug === \App\Models\Role::SLUG_AGENT && in_array($user->status, ['pending', 'pending_payment'], true))
                     <form method="post" action="{{ route('admin.users.decline-agent', $user) }}" onsubmit="return confirm(@json(__('Decline this agent application? They will not be able to sign in.')))">

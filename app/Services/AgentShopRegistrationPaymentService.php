@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\PaystackTransaction;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\PaystackPaymentPurpose;
 use App\Support\PaystackVerifyAmount;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +60,7 @@ class AgentShopRegistrationPaymentService
                     'channel' => null,
                     'paid_at' => null,
                     'metadata' => [
-                        'kind' => 'agent_shop_registration',
+                        'kind' => PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION,
                         'reconciled_at' => now()->toIso8601String(),
                     ],
                 ]);
@@ -104,8 +105,7 @@ class AgentShopRegistrationPaymentService
                 throw new RuntimeException('Paystack verify response did not include an amount.');
             }
 
-            $pesewasDiff = abs($expectedPesewas - $paidPesewas);
-            if ($pesewasDiff > 10) {
+            if (! PaystackVerifyAmount::registrationFeeMatches($expectedPesewas, $paidPesewas)) {
                 Log::error('agent_shop_registration_amount_mismatch', [
                     'reference' => $reference,
                     'user_id' => $userId,
@@ -117,8 +117,8 @@ class AgentShopRegistrationPaymentService
                 throw new RuntimeException('Paid amount does not match the registration fee.');
             }
 
-            if ($pesewasDiff > 0) {
-                Log::warning('agent_shop_registration_amount_minor_pesewa_diff', [
+            if ($paidPesewas !== $expectedPesewas) {
+                Log::info('agent_shop_registration_amount_fee_adjustment', [
                     'reference' => $reference,
                     'expected_pesewas' => $expectedPesewas,
                     'paid_pesewas' => $paidPesewas,
@@ -141,11 +141,15 @@ class AgentShopRegistrationPaymentService
             }
 
             $txn->fill([
-                'amount' => number_format($expectedPesewas / 100, 2, '.', ''),
+                'amount' => PaystackVerifyAmount::ghsFromPesewas($paidPesewas),
                 'status' => 'success',
                 'channel' => isset($verifyData['channel']) ? (string) $verifyData['channel'] : null,
                 'paid_at' => $paidAt,
-                'metadata' => $verifyData,
+                'metadata' => PaystackPaymentPurpose::metadataAfterSuccess(
+                    PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION,
+                    $verifyData,
+                    $txn,
+                ),
             ]);
             $txn->save();
 

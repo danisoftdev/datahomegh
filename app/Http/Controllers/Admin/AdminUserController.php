@@ -6,12 +6,17 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Http\Controllers\Controller;
 use App\Mail\AgentAccountApprovedMail;
 use App\Models\PasswordResetCode;
+use App\Models\PaystackTransaction;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\NotificationService;
+use App\Services\PaystackService;
 use App\Services\UserAccountPurgeService;
 use App\Services\WalletService;
+use App\Support\PaystackPaymentPurpose;
+use App\Support\PaystackVerifyAmount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +25,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use RuntimeException;
+use Throwable;
 
 class AdminUserController extends Controller
 {
@@ -27,6 +34,8 @@ class AdminUserController extends Controller
         private readonly NotificationService $notificationService,
         private readonly UserAccountPurgeService $userAccountPurgeService,
         private readonly WalletService $walletService,
+        private readonly PaystackService $paystackService,
+        private readonly AgentShopRegistrationPaymentService $registrationPaymentService,
     ) {}
 
     public function index(Request $request): View
@@ -134,11 +143,73 @@ class AdminUserController extends Controller
 
         $ledger = $user->walletLedgers()->orderByDesc('id')->paginate(15, ['*'], 'ledger_page');
 
+        $registrationTransaction = null;
+        if ($user->role?->slug === Role::SLUG_AGENT) {
+            $registrationTransaction = PaystackTransaction::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->get()
+                ->first(fn (PaystackTransaction $txn): bool => PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION
+                    || ($txn->status === 'pending' && $user->status === 'pending_payment'));
+        }
+
         return view('admin.users.show', [
             'user' => $user,
             'orders' => $orders,
             'ledger' => $ledger,
+            'registrationTransaction' => $registrationTransaction,
         ]);
+    }
+
+    public function confirmRegistrationPayment(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($user->role?->slug === Role::SLUG_AGENT, 404);
+
+        if (! in_array($user->status, ['pending_payment', 'pending'], true)) {
+            return back()->with('error', __('This agent is not waiting for a registration payment.'));
+        }
+
+        $validated = $request->validate([
+            'reference' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $reference = trim((string) ($validated['reference'] ?? ''));
+        if ($reference === '') {
+            $reference = (string) (PaystackTransaction::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->value('reference') ?? '');
+        }
+
+        if ($reference === '') {
+            return back()->with('error', __('Enter the Paystack reference from the agent’s receipt, or ask them to open the return link after payment.'));
+        }
+
+        try {
+            $data = $this->paystackService->verifyPayment($reference);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if (strtolower((string) ($data['status'] ?? '')) !== 'success') {
+            return back()->with('error', __('Paystack has not marked this payment as successful yet. Try again shortly.'));
+        }
+
+        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
+
+        try {
+            $this->registrationPaymentService->completeSuccessfulPayment($user->id, $reference, $amountGhs, $data);
+        } catch (Throwable $e) {
+            Log::error('admin_confirm_registration_payment_failed', [
+                'user_id' => $user->id,
+                'reference' => $reference,
+                'exception' => $e,
+            ]);
+
+            return back()->with('error', __('Could not confirm payment: :message', ['message' => $e->getMessage()]));
+        }
+
+        return back()->with('status', __('Registration payment confirmed. The agent is now awaiting approval (status: pending).'));
     }
 
     public function approveAgent(User $user): RedirectResponse
