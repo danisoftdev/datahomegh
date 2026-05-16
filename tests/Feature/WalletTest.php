@@ -10,8 +10,10 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletLedger;
 use App\Services\WalletService;
+use App\Support\PaystackPaymentPurpose;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -122,6 +124,14 @@ class WalletTest extends TestCase
             'user_id' => $buyer->id,
             'balance' => '0.00',
             'is_frozen' => false,
+        ]);
+
+        PaystackTransaction::query()->create([
+            'user_id' => $buyer->id,
+            'reference' => 'ref_webhook_unit',
+            'amount' => '50.00',
+            'status' => 'pending',
+            'metadata' => ['kind' => PaystackPaymentPurpose::WALLET_TOPUP],
         ]);
 
         $payload = [
@@ -257,5 +267,104 @@ class WalletTest extends TestCase
             ->where('reference', 'ref_agent_webhook_no_meta_uid')
             ->where('source', 'PAYSTACK')
             ->exists());
+    }
+
+    public function test_wallet_topup_callback_without_login_credits_wallet_using_transaction_row(): void
+    {
+        config(['paystack.secret_key' => 'sk_test_secret', 'paystack.base_url' => 'https://api.paystack.co']);
+
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'agent_id' => null,
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '0.00',
+            'is_frozen' => false,
+        ]);
+
+        PaystackTransaction::query()->create([
+            'user_id' => $buyer->id,
+            'reference' => 'ref_guest_topup_cb',
+            'amount' => '30.00',
+            'status' => 'pending',
+            'metadata' => ['kind' => PaystackPaymentPurpose::WALLET_TOPUP],
+        ]);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/*' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'reference' => 'ref_guest_topup_cb',
+                    'amount' => 3000,
+                    'metadata' => [
+                        'user_id' => $buyer->id,
+                        'type' => PaystackPaymentPurpose::WALLET_TOPUP,
+                    ],
+                    'paid_at' => now()->toIso8601String(),
+                ],
+            ]),
+        ]);
+
+        $this->get(route('wallet.topup.callback', ['reference' => 'ref_guest_topup_cb']))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status');
+
+        $this->assertSame('30.00', (string) $buyer->wallet->fresh()->balance);
+    }
+
+    public function test_repeat_webhook_for_completed_agent_registration_does_not_credit_wallet(): void
+    {
+        config(['paystack.secret_key' => 'sk_test_secret']);
+        PlatformSetting::set(PlatformSetting::KEY_AGENT_SHOP_REGISTRATION_FEE_GHS, '25.00');
+
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'pending',
+            'shop_slug' => 'Ab12c',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $agent->id,
+            'balance' => '0.00',
+            'is_frozen' => false,
+        ]);
+
+        PaystackTransaction::query()->create([
+            'user_id' => $agent->id,
+            'reference' => 'ref_agent_repeat_wh',
+            'amount' => '25.00',
+            'status' => 'success',
+            'paid_at' => now(),
+            'metadata' => PaystackPaymentPurpose::metadataAfterSuccess(
+                PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION,
+                ['status' => 'success', 'amount' => 2500],
+            ),
+        ]);
+
+        $payload = [
+            'event' => 'charge.success',
+            'data' => [
+                'reference' => 'ref_agent_repeat_wh',
+                'amount' => 2500,
+                'metadata' => ['user_id' => $agent->id],
+            ],
+        ];
+
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+        $sig = hash_hmac('sha512', $raw, 'sk_test_secret');
+
+        $this->call('POST', route('wallet.paystack.webhook'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X-Paystack-Signature' => $sig,
+        ], $raw)->assertOk();
+
+        $this->assertSame('0.00', (string) $agent->wallet->fresh()->balance);
+        $this->assertFalse(WalletLedger::query()->where('user_id', $agent->id)->where('source', 'PAYSTACK')->exists());
     }
 }

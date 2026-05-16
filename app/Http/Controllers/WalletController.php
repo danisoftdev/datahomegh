@@ -10,6 +10,7 @@ use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Services\WalletService;
 use App\Support\PaystackChargeMetadata;
+use App\Support\PaystackPaymentPurpose;
 use App\Support\PaystackVerifyAmount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -84,6 +85,7 @@ class WalletController extends Controller
                 'channel' => null,
                 'paid_at' => null,
                 'metadata' => [
+                    'kind' => PaystackPaymentPurpose::WALLET_TOPUP,
                     'initialized_at' => now()->toIso8601String(),
                 ],
             ],
@@ -99,58 +101,70 @@ class WalletController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        $reference = (string) (
-            $request->query('reference')
-            ?? $request->query('trxref')
-            ?? $request->input('reference')
-            ?? $request->input('trxref')
-            ?? ''
-        );
+        $reference = $this->paystackReferenceFromRequest($request);
 
         if ($reference === '') {
-            return redirect()->route('wallet.index')->withErrors(['paystack' => __('Missing payment reference.')]);
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('Missing payment reference.')]);
         }
-
-        $session = $request->session()->get('wallet_topup');
 
         try {
             $data = $this->paystackService->verifyPayment($reference);
         } catch (RuntimeException $e) {
-            return redirect()->route('wallet.index')->withErrors(['paystack' => $e->getMessage()]);
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => $e->getMessage()]);
         }
 
         if (strtolower((string) ($data['status'] ?? '')) !== 'success') {
-            return redirect()->route('wallet.index')->withErrors(['paystack' => __('Payment was not successful.')]);
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('Payment was not successful.')]);
         }
 
-        $userId = (int) (PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
-        $authId = (int) $request->user()->id;
+        $txn = PaystackTransaction::query()->where('reference', $reference)->first();
+        $purpose = PaystackPaymentPurpose::resolve($txn, $data);
 
-        if ($userId !== $authId) {
-            return redirect()->route('wallet.index')->withErrors(['paystack' => __('Payment does not match this account.')]);
+        if ($purpose === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
+            return redirect()->route('register.agent-fee.callback', [
+                'reference' => $reference,
+                'trxref' => $reference,
+            ]);
         }
 
-        if (is_array($session)) {
+        $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
+        if ($userId <= 0) {
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('This payment could not be linked to an account.')]);
+        }
+
+        $authUser = $request->user();
+        if ($authUser !== null && (int) $authUser->id !== $userId) {
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('Payment does not match this account.')]);
+        }
+
+        $session = $request->session()->get('wallet_topup');
+        if (is_array($session) && $authUser !== null) {
             $sessionRef = (string) ($session['reference'] ?? '');
             $sessionUid = (int) ($session['user_id'] ?? 0);
-            if ($sessionRef !== $reference || $sessionUid !== $authId) {
-                return redirect()->route('wallet.index')->withErrors(['paystack' => __('This payment session is invalid or expired.')]);
+            if ($sessionRef !== '' && ($sessionRef !== $reference || $sessionUid !== $userId)) {
+                return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('This payment session is invalid or expired.')]);
             }
         }
 
         $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
-            $this->applyVerifiedPaystackCredit($userId, $reference, $amountGhs, $data);
+            $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
         } catch (Throwable $e) {
             Log::error('Wallet topup callback failed', ['reference' => $reference, 'exception' => $e]);
 
-            return redirect()->route('wallet.index')->withErrors(['paystack' => __('Could not complete wallet credit. Support has been notified.')]);
+            return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('Could not complete wallet credit. Support has been notified.')]);
         }
 
         $request->session()->forget('wallet_topup');
 
-        return redirect()->route('wallet.index')->with('status', __('Wallet topped up successfully.'));
+        $message = __('Wallet topped up successfully.');
+
+        if ($authUser !== null) {
+            return redirect()->route('wallet.index')->with('status', $message);
+        }
+
+        return redirect()->route('login')->with('status', $message.' '.__('Sign in to view your balance.'));
     }
 
     public function webhook(Request $request): JsonResponse
@@ -175,21 +189,32 @@ class WalletController extends Controller
             return response()->json([], 200);
         }
 
-        $userId = (int) (PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
-
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
-        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
-            $userId = (int) $txn->user_id;
-        } elseif ($userId <= 0) {
-            return response()->json([], 200);
-        }
-
+        $purpose = PaystackPaymentPurpose::resolve($txn, $data);
         $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
-            $this->applyVerifiedPaystackCredit($userId, $reference, $amountGhs, $data);
+            if ($purpose === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
+                $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
+                if ($userId <= 0) {
+                    Log::warning('paystack_webhook_agent_registration_missing_user', ['reference' => $reference]);
+
+                    return response()->json([], 200);
+                }
+                $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $data);
+            } elseif ($purpose === PaystackPaymentPurpose::WALLET_TOPUP) {
+                $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
+                if ($userId <= 0) {
+                    Log::warning('paystack_webhook_wallet_topup_missing_user', ['reference' => $reference]);
+
+                    return response()->json([], 200);
+                }
+                $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
+            } else {
+                Log::warning('paystack_webhook_unknown_purpose', ['reference' => $reference, 'purpose' => $purpose]);
+            }
         } catch (Throwable $e) {
-            Log::error('Paystack webhook wallet credit failed', ['reference' => $reference, 'exception' => $e]);
+            Log::error('Paystack webhook processing failed', ['reference' => $reference, 'exception' => $e]);
 
             return response()->json(['message' => 'Processing error'], 500);
         }
@@ -244,29 +269,20 @@ class WalletController extends Controller
     }
 
     /**
+     * Credits a user wallet from a verified Paystack charge. Never used for agent registration fees.
+     *
      * @param  array<string, mixed>  $verifyData
      */
-    private function applyVerifiedPaystackCredit(int $userId, string $reference, string $amountGhs, array $verifyData): void
+    private function applyWalletTopupFromPaystack(int $userId, string $reference, string $amountGhs, array $verifyData): void
     {
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
-        $meta = PaystackChargeMetadata::fromChargeData($verifyData);
+        if (PaystackPaymentPurpose::resolve($txn, $verifyData) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
+            Log::warning('paystack_wallet_topup_blocked_registration_payment', [
+                'user_id' => $userId,
+                'reference' => $reference,
+            ]);
 
-        if ($txn !== null && (($txn->metadata['kind'] ?? null) === 'agent_shop_registration')) {
-            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment((int) $txn->user_id, $reference, $amountGhs, $verifyData);
-
-            return;
-        }
-
-        if ($meta['type'] === 'agent_shop_registration') {
-            $uid = (int) ($meta['user_id'] ?? 0);
-            if ($uid <= 0) {
-                Log::warning('paystack_agent_registration_missing_user_id', ['reference' => $reference]);
-
-                return;
-            }
-            $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($uid, $reference, $amountGhs, $verifyData);
-
-            return;
+            throw new RuntimeException('This Paystack payment is an agent registration fee, not a wallet top-up.');
         }
 
         $target = User::query()->with('role')->find($userId);
@@ -283,7 +299,11 @@ class WalletController extends Controller
         DB::transaction(function () use ($userId, $reference, $amountGhs, $verifyData): void {
             $txn = PaystackTransaction::query()->where('reference', $reference)->lockForUpdate()->first();
 
-            if ($txn !== null && $txn->status === 'success') {
+            if ($txn !== null && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
+                return;
+            }
+
+            if ($txn !== null && $txn->status === 'success' && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::WALLET_TOPUP) {
                 return;
             }
 
@@ -293,6 +313,20 @@ class WalletController extends Controller
                 ->where('source', 'PAYSTACK')
                 ->where('type', 'CREDIT')
                 ->exists()) {
+                if ($txn !== null && $txn->status !== 'success') {
+                    $txn->fill([
+                        'status' => 'success',
+                        'channel' => isset($verifyData['channel']) ? (string) $verifyData['channel'] : $txn->channel,
+                        'paid_at' => isset($verifyData['paid_at']) ? Carbon::parse($verifyData['paid_at']) : now(),
+                        'metadata' => PaystackPaymentPurpose::metadataAfterSuccess(
+                            PaystackPaymentPurpose::WALLET_TOPUP,
+                            $verifyData,
+                            $txn,
+                        ),
+                    ]);
+                    $txn->save();
+                }
+
                 return;
             }
 
@@ -306,9 +340,33 @@ class WalletController extends Controller
                     'status' => 'success',
                     'channel' => isset($verifyData['channel']) ? (string) $verifyData['channel'] : null,
                     'paid_at' => isset($verifyData['paid_at']) ? Carbon::parse($verifyData['paid_at']) : now(),
-                    'metadata' => $verifyData,
+                    'metadata' => PaystackPaymentPurpose::metadataAfterSuccess(
+                        PaystackPaymentPurpose::WALLET_TOPUP,
+                        $verifyData,
+                        $txn,
+                    ),
                 ],
             );
         });
+    }
+
+    private function paystackReferenceFromRequest(Request $request): string
+    {
+        return (string) (
+            $request->query('reference')
+            ?? $request->query('trxref')
+            ?? $request->input('reference')
+            ?? $request->input('trxref')
+            ?? ''
+        );
+    }
+
+    private function paystackRedirectForUser(Request $request): RedirectResponse
+    {
+        if ($request->user() !== null) {
+            return redirect()->route('wallet.index');
+        }
+
+        return redirect()->route('login');
     }
 }
