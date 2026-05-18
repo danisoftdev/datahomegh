@@ -18,6 +18,32 @@
                 <div><dt class="text-slate-500">{{ __('Buyer') }}</dt><dd>{{ $order->user?->username }} (#{{ $order->user_id }})</dd></div>
                 <div><dt class="text-slate-500">{{ __('Agent') }}</dt><dd>{{ $order->agent?->username ?? '—' }}</dd></div>
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}</dd></div>
+                @if ($order->provider_order_reference || $order->provider_status || $order->fulfillment_api_profile_id)
+                    <div class="sm:col-span-2 border-t border-white/10 pt-3">
+                        <dt class="text-slate-500">{{ __('External provider') }}</dt>
+                        <dd class="mt-1 space-y-1 text-sm">
+                            @if ($order->provider_order_reference)
+                                <p><span class="text-slate-500">{{ __('Reference') }}:</span> <span class="font-mono text-white">{{ $order->provider_order_reference }}</span></p>
+                            @endif
+                            @if ($order->provider_status)
+                                <p><span class="text-slate-500">{{ __('Provider status') }}:</span> <span class="text-[#FFD700]">{{ $order->provider_status }}</span>
+                                    @if ($order->provider_status_synced_at)
+                                        <span class="text-slate-500">({{ $order->provider_status_synced_at->format('Y-m-d H:i') }})</span>
+                                    @endif
+                                </p>
+                            @endif
+                            @if ($order->fulfillmentApiProfile)
+                                <p class="text-xs text-slate-500">{{ $order->fulfillmentApiProfile->name }} · {{ $order->fulfillmentApiProfile->base_url }}</p>
+                            @endif
+                        </dd>
+                        @if ($order->provider_order_reference && $order->fulfillment_api_profile_id)
+                            <form method="post" action="{{ route('admin.orders.refresh-provider-status', $order) }}" class="mt-3">
+                                @csrf
+                                <button type="submit" class="rounded-lg border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/5">{{ __('Refresh status from provider') }}</button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
             </dl>
             @include('orders.partials.afa-registration', ['order' => $order])
         </div>

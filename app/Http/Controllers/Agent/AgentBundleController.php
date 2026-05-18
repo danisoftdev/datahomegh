@@ -111,6 +111,7 @@ class AgentBundleController extends Controller
             'package_kind' => ['nullable', Rule::in(BundlePackageKind::all())],
             'name' => ['required', 'string', 'max:255'],
             'size_label' => ['required', 'string', 'max:100'],
+            'provider_bundle_type' => ['nullable', 'string', 'max:120'],
             'internal_cost' => ['required', 'numeric', 'min:0'],
             'stock_count' => ['required', 'integer', 'min:0', 'max:99999999'],
         ]);
@@ -121,6 +122,14 @@ class AgentBundleController extends Controller
             throw ValidationException::withMessages([
                 'network' => [__('MTN AFA bundles must use the MTN network.')],
             ]);
+        }
+
+        $data['provider_bundle_type'] = filled($data['provider_bundle_type'] ?? null)
+            ? trim((string) $data['provider_bundle_type'])
+            : null;
+
+        if (($data['package_kind'] ?? '') === BundlePackageKind::MTN_AFA) {
+            $data['provider_bundle_type'] = null;
         }
 
         return $data;

@@ -16,6 +16,7 @@ class BundlePackage extends Model
         'package_kind',
         'name',
         'size_label',
+        'provider_bundle_type',
         'internal_cost',
         'stock_count',
         'is_available',

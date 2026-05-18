@@ -18,6 +18,10 @@ class Order extends Model
         'bundle_package_id',
         'amount',
         'status',
+        'provider_order_reference',
+        'provider_status',
+        'provider_status_synced_at',
+        'fulfillment_api_profile_id',
     ];
 
     protected function casts(): array
@@ -25,6 +29,7 @@ class Order extends Model
         return [
             'amount' => 'decimal:2',
             'afa_registration' => 'array',
+            'provider_status_synced_at' => 'datetime',
         ];
     }
 
@@ -45,6 +50,11 @@ class Order extends Model
     public function bundlePackage(): BelongsTo
     {
         return $this->belongsTo(BundlePackage::class);
+    }
+
+    public function fulfillmentApiProfile(): BelongsTo
+    {
+        return $this->belongsTo(FulfillmentApiProfile::class);
     }
 
     public function orderStatusHistories(): HasMany
