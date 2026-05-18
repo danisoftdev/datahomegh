@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminBundleController;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminFulfillmentApiController;
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminProfileController;
@@ -36,14 +37,13 @@ Route::get('/pending-approval', [AuthController::class, 'pendingApproval'])
     ->name('pending-approval');
 
 Route::middleware('guest')->group(function (): void {
+    Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
+        ->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
     Route::get('/register/agent-fee/confirm', [AgentRegistrationFeeController::class, 'showConfirmForm'])
         ->name('register.agent-fee.confirm-form');
     Route::match(['get', 'post'], '/register/agent-fee/callback', [AgentRegistrationFeeController::class, 'callback'])
         ->name('register.agent-fee.callback');
-
-    Route::get('/register/{agentSlug?}', [AuthController::class, 'showRegisterForm'])
-        ->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
 
     Route::get('/login', [AuthController::class, 'showLoginForm'])
         ->name('login');
@@ -154,6 +154,15 @@ Route::middleware('auth')->group(function (): void {
         Route::get('orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
         Route::patch('orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.status');
         Route::post('orders/{order}/notes', [AdminOrderController::class, 'addNote'])->name('orders.notes');
+        Route::post('orders/{order}/refresh-provider-status', [AdminOrderController::class, 'refreshProviderStatus'])
+            ->name('orders.refresh-provider-status');
+
+        Route::get('fulfillment-apis', [AdminFulfillmentApiController::class, 'index'])->name('fulfillment-apis.index');
+        Route::get('fulfillment-apis/{fulfillmentApiProfile}/edit', [AdminFulfillmentApiController::class, 'edit'])->name('fulfillment-apis.edit');
+        Route::post('fulfillment-apis', [AdminFulfillmentApiController::class, 'store'])->name('fulfillment-apis.store');
+        Route::patch('fulfillment-apis/{fulfillmentApiProfile}', [AdminFulfillmentApiController::class, 'update'])->name('fulfillment-apis.update');
+        Route::post('fulfillment-apis/{fulfillmentApiProfile}/activate', [AdminFulfillmentApiController::class, 'activate'])->name('fulfillment-apis.activate');
+        Route::delete('fulfillment-apis/{fulfillmentApiProfile}', [AdminFulfillmentApiController::class, 'destroy'])->name('fulfillment-apis.destroy');
 
         Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
         Route::get('users/create-agent', [AdminUserController::class, 'createAgent'])->name('users.create-agent');

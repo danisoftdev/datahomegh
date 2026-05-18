@@ -24,6 +24,19 @@
         <label class="mb-1 block text-sm text-slate-400">{{ __('Size label') }}</label>
         <input type="text" name="size_label" required value="{{ old('size_label', $editing ? $bundle->size_label : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
     </div>
+    @php($pkgKind = old('package_kind', $editing ? ($bundle->package_kind ?? 'data') : 'data'))
+    @if ($pkgKind !== 'mtn_afa')
+        <div>
+            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code') }}</label>
+            <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
+                placeholder="{{ __('e.g. mtnup2u') }}"
+                class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+            <p class="mt-1 text-xs text-slate-500">{{ __('Optional. Used when the supplier has an active API for this network.') }}</p>
+            @error('provider_bundle_type')
+                <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
+    @endif
     <div>
         <label class="mb-1 block text-sm text-slate-400">{{ __('Price (GHS)') }}</label>
         <input type="number" step="0.01" name="internal_cost" required value="{{ old('internal_cost', $editing ? $bundle->internal_cost : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />

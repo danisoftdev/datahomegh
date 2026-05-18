@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\DataPackageFulfillmentService;
 use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class AdminOrderController extends Controller
 {
     public function __construct(
         private readonly OrderService $orderService,
+        private readonly DataPackageFulfillmentService $dataPackageFulfillmentService,
     ) {}
 
     public function index(Request $request): View
@@ -43,7 +45,7 @@ class AdminOrderController extends Controller
     {
         $this->assertOrderVisibleToSupplier($order);
 
-        $order->load(['user', 'agent', 'bundlePackage']);
+        $order->load(['user', 'agent', 'bundlePackage', 'fulfillmentApiProfile']);
 
         $histories = $order->orderStatusHistories()->with('changedBy')->orderBy('id')->get();
 
@@ -133,6 +135,19 @@ class AdminOrderController extends Controller
         );
 
         return back()->with('status', __('Note added.'));
+    }
+
+    public function refreshProviderStatus(Request $request, Order $order): RedirectResponse
+    {
+        $this->assertOrderVisibleToSupplier($order);
+
+        $result = $this->dataPackageFulfillmentService->refreshProviderStatus($order);
+
+        if (! $result['ok']) {
+            return back()->with('error', $result['message']);
+        }
+
+        return back()->with('status', $result['message']);
     }
 
     public function export(Request $request): StreamedResponse

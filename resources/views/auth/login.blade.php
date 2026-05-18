@@ -58,11 +58,9 @@
             {{ __('No account yet?') }}
             <a href="{{ route('register') }}" class="font-medium text-[#FFD700] hover:underline">{{ __('Register') }}</a>
         </p>
-        @if (\Illuminate\Support\Facades\Route::has('register.agent-fee.confirm-form'))
-            <p class="mt-3 text-center text-xs text-slate-500">
-                {{ __('Paid agent registration fee but still waiting?') }}
-                <a href="{{ route('register.agent-fee.confirm-form') }}" class="text-[#FFD700] hover:underline">{{ __('Confirm payment') }}</a>
-            </p>
-        @endif
+        <p class="mt-3 text-center text-xs text-slate-500">
+            {{ __('Paid agent registration fee but still waiting?') }}
+            <a href="{{ route('register.agent-fee.confirm-form') }}" class="text-[#FFD700] hover:underline">{{ __('Confirm payment') }}</a>
+        </p>
     </div>
 @endsection

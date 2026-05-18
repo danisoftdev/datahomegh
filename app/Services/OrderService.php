@@ -23,6 +23,7 @@ class OrderService
     public function __construct(
         private readonly WalletService $walletService,
         private readonly NotificationService $notificationService,
+        private readonly DataPackageFulfillmentService $dataPackageFulfillmentService,
     ) {}
 
     /**
@@ -49,7 +50,7 @@ class OrderService
             throw new InvalidArgumentException('Too many items in one checkout.');
         }
 
-        return DB::transaction(function () use ($userId, $lines): Collection {
+        $orders = DB::transaction(function () use ($userId, $lines): Collection {
             /** @var User $user */
             $user = User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
 
@@ -214,6 +215,12 @@ class OrderService
 
             return $orders;
         });
+
+        foreach ($orders as $order) {
+            $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order);
+        }
+
+        return $orders;
     }
 
     /**
