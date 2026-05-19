@@ -150,6 +150,19 @@ class AdminOrderController extends Controller
         return back()->with('status', $result['message']);
     }
 
+    public function dispatchToProvider(Request $request, Order $order): RedirectResponse
+    {
+        $this->assertOrderVisibleToSupplier($order);
+
+        $result = $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order->fresh(['bundlePackage']));
+
+        if ($result['ok']) {
+            return back()->with('status', $result['message']);
+        }
+
+        return back()->with('error', $result['message']);
+    }
+
     public function export(Request $request): StreamedResponse
     {
         $query = Order::query()->visibleToSupplier()->with(['user', 'agent', 'bundlePackage']);

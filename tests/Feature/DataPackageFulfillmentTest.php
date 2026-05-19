@@ -148,6 +148,50 @@ class DataPackageFulfillmentTest extends TestCase
 
         $order = Order::query()->latest('id')->firstOrFail();
         $this->assertNull($order->provider_order_reference);
+        $this->assertNotNull($order->provider_dispatch_error);
+    }
+
+    public function test_admin_dispatch_to_provider_shows_error_when_bundle_code_missing(): void
+    {
+        $supplier = $this->supplier();
+
+        FulfillmentApiProfile::query()->create([
+            'supplier_user_id' => $supplier->id,
+            'network' => 'MTN',
+            'name' => 'Test API',
+            'base_url' => 'https://provider.test',
+            'api_key' => 'secret-key',
+            'is_active' => true,
+        ]);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Plain Bundle',
+            'size_label' => '1GB',
+            'provider_bundle_type' => null,
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        $order = Order::query()->latest('id')->firstOrFail();
+
+        $this->actingAs($supplier)->post(route('admin.orders.dispatch-to-provider', $order))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('provider bundle code', strtolower((string) $order->fresh()->provider_dispatch_error));
     }
 
     public function test_admin_can_refresh_provider_status(): void

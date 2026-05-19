@@ -22,6 +22,7 @@ class Order extends Model
         'provider_status',
         'provider_status_synced_at',
         'fulfillment_api_profile_id',
+        'provider_dispatch_error',
     ];
 
     protected function casts(): array

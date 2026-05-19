@@ -156,6 +156,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('orders/{order}/notes', [AdminOrderController::class, 'addNote'])->name('orders.notes');
         Route::post('orders/{order}/refresh-provider-status', [AdminOrderController::class, 'refreshProviderStatus'])
             ->name('orders.refresh-provider-status');
+        Route::post('orders/{order}/dispatch-to-provider', [AdminOrderController::class, 'dispatchToProvider'])
+            ->name('orders.dispatch-to-provider');
 
         Route::get('fulfillment-apis', [AdminFulfillmentApiController::class, 'index'])->name('fulfillment-apis.index');
         Route::get('fulfillment-apis/{fulfillmentApiProfile}/edit', [AdminFulfillmentApiController::class, 'edit'])->name('fulfillment-apis.edit');
