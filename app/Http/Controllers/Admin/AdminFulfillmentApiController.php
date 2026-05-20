@@ -46,6 +46,11 @@ class AdminFulfillmentApiController extends Controller
         $data['supplier_user_id'] = (int) $request->user()->id;
         $data['is_active'] = false;
         $data['base_url'] = rtrim($data['base_url'], '/');
+        if (isset($data['default_provider_bundle_type']) && $data['default_provider_bundle_type'] !== null && $data['default_provider_bundle_type'] !== '') {
+            $data['default_provider_bundle_type'] = trim((string) $data['default_provider_bundle_type']);
+        } else {
+            $data['default_provider_bundle_type'] = null;
+        }
 
         FulfillmentApiProfile::query()->create($data);
 
@@ -60,6 +65,7 @@ class AdminFulfillmentApiController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'base_url' => ['required', 'url', 'max:512'],
             'api_key' => ['nullable', 'string', 'max:2000'],
+            'default_provider_bundle_type' => ['nullable', 'string', 'max:120'],
         ]);
 
         if (($data['api_key'] ?? '') !== '') {
@@ -67,6 +73,9 @@ class AdminFulfillmentApiController extends Controller
         }
         $fulfillmentApiProfile->name = $data['name'];
         $fulfillmentApiProfile->base_url = rtrim($data['base_url'], '/');
+        $fulfillmentApiProfile->default_provider_bundle_type = filled($data['default_provider_bundle_type'] ?? null)
+            ? trim((string) $data['default_provider_bundle_type'])
+            : null;
         $fulfillmentApiProfile->save();
 
         return back()->with('status', __('API profile updated.'));
@@ -103,7 +112,7 @@ class AdminFulfillmentApiController extends Controller
     }
 
     /**
-     * @return array{name: string, network: string, base_url: string, api_key: string}
+     * @return array{name: string, network: string, base_url: string, api_key: string, default_provider_bundle_type?: string|null}
      */
     private function validatedCreate(Request $request): array
     {
@@ -112,6 +121,7 @@ class AdminFulfillmentApiController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'base_url' => ['required', 'url', 'max:512'],
             'api_key' => ['required', 'string', 'max:2000'],
+            'default_provider_bundle_type' => ['nullable', 'string', 'max:120'],
         ]);
     }
 }

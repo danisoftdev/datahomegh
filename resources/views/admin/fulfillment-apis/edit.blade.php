@@ -29,6 +29,14 @@
                 @enderror
             </div>
             <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Default provider bundle code (optional)') }}</label>
+                <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type', $profile->default_provider_bundle_type ?? '') }}" maxlength="120" placeholder="{{ __('Used when a bundle has no code') }}"
+                    class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                @error('default_provider_bundle_type')
+                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('New API key (leave blank to keep current)') }}</label>
                 <input type="password" name="api_key" value="" autocomplete="new-password" maxlength="2000" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
                 @error('api_key')

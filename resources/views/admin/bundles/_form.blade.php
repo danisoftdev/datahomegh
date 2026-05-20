@@ -32,7 +32,7 @@
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
                 placeholder="{{ __('e.g. mtnup2u — sent to external API') }}"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-            <p class="mt-1 text-xs text-slate-500">{{ __('Optional. When set and an API profile is active for this network, new orders call the provider automatically.') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Per-bundle code is used first. If empty, the active API profile default is used; then the app .env fallback for this bundle’s network (FULFILLMENT_*_DATA_FALLBACK_BUNDLE_TYPE).') }}</p>
             @error('provider_bundle_type')
                 <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
             @enderror
