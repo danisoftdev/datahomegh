@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Fulfillment\GeonetFulfillmentClient;
 use App\Services\Fulfillment\IgetFulfillmentClient;
 use App\Support\FulfillmentProviderType;
+use App\Support\GeonetMtnNetworkKey;
 
 final class DataPackageFulfillmentService
 {
@@ -138,10 +139,15 @@ final class DataPackageFulfillmentService
     }
 
     /**
-     * bundleType (iGet) or network_key (Geonettech).
+     * bundleType (iGet Telecel) or network_key (Geonettech MTN — fixed in config).
      */
     private function resolveProductCode(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile): string
     {
+        if ($profile->provider_type === FulfillmentProviderType::GEONET
+            && GeonetMtnNetworkKey::isMtnNetwork((string) $order->network)) {
+            return GeonetMtnNetworkKey::resolve();
+        }
+
         $fromBundle = trim((string) ($bundle->provider_bundle_type ?? ''));
         if ($fromBundle !== '') {
             return $fromBundle;
@@ -161,7 +167,7 @@ final class DataPackageFulfillmentService
     private function missingProductCodeMessage(FulfillmentApiProfile $profile): string
     {
         return match ($profile->provider_type) {
-            FulfillmentProviderType::GEONET => __('No Geonettech network_key for this order. Set it on the bundle or as the default on the MTN API profile (e.g. YELLO).'),
+            FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
             FulfillmentProviderType::IGET => __('No iGet bundle code for this order. Set it on the bundle or as the default on the Telecel API profile (e.g. telecelup2u).'),
             default => __('No provider product code configured for this order.'),
         };

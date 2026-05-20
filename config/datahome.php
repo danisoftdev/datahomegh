@@ -11,7 +11,8 @@ return [
     | - iget: Telecel (bundleType, X-API-Key)
     | - geonet: MTN (network_key, Bearer token)
     |
-    | fallback_codes are used when bundle + profile default are empty.
+    | geonet MTN network_key is always fallback_codes.geonet.MTN (YELLO), not bundle labels.
+    | iget Telecel uses bundle → profile default → fallback_codes.iget.TELECEL.
     |
     */
     'fulfillment' => [
