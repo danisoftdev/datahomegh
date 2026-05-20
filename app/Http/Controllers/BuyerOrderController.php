@@ -180,6 +180,22 @@ class BuyerOrderController extends Controller
         ]);
     }
 
+    public function cancel(Request $request, Order $order): RedirectResponse
+    {
+        $this->authorizeBuyerOrder($request->user(), $order);
+
+        try {
+            $this->orderService->cancelPendingOrderByPurchaser($request->user(), $order->fresh());
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['cancel' => $e->getMessage()]);
+        }
+
+        return redirect()->route('buyer.orders.show', $order->fresh())->with(
+            'status',
+            __('Order cancelled. Your wallet was refunded automatically.')
+        );
+    }
+
     public function repeatLast(Request $request): JsonResponse
     {
         $last = $request->user()->orders()->with('bundlePackage')->latest()->first();

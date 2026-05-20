@@ -11,5 +11,6 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('api.token')->group(function (): void {
         Route::get('wallet', [ApiWalletController::class, 'show']);
         Route::post('orders', [ApiOrderController::class, 'store']);
+        Route::post('orders/{order}/cancel', [ApiOrderController::class, 'cancel']);
     });
 });

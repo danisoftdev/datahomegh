@@ -6,6 +6,7 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Models\BundlePackage;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
+use App\Models\Role;
 use App\Models\ResalePlan;
 use App\Models\RolePrice;
 use App\Models\User;
@@ -221,6 +222,36 @@ class OrderService
         }
 
         return $orders;
+    }
+
+    /**
+     * Buyer or agent cancels their own mistaken purchase while still PENDING: refund wallet and RESTOCK bundle (same as admin REFUNDED).
+     *
+     * @throws InvalidArgumentException
+     */
+    public function cancelPendingOrderByPurchaser(User $actor, Order $order): Order
+    {
+        if (! in_array($actor->role?->slug, [Role::SLUG_BUYER, Role::SLUG_AGENT], true)) {
+            throw new InvalidArgumentException('Only buyers and agents can cancel purchases this way.');
+        }
+
+        if ((int) $order->user_id !== (int) $actor->id) {
+            throw new InvalidArgumentException('You can only cancel orders charged to your wallet.');
+        }
+
+        if ($order->status !== 'PENDING') {
+            throw new InvalidArgumentException(
+                __('This order can no longer be cancelled from your account. Once it moves past pending, please contact support.')
+            );
+        }
+
+        return $this->updateStatus(
+            $order->id,
+            'REFUNDED',
+            (int) $actor->id,
+            __('Cancelled by customer — refunded to wallet'),
+            true,
+        );
     }
 
     /**

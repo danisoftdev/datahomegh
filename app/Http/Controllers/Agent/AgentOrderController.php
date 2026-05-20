@@ -139,6 +139,24 @@ class AgentOrderController extends Controller
         return back()->with('status', __('Note added.'));
     }
 
+    /**
+     * Agent cancels their own catalogue purchase (order.user_id = agent), not buyer-linked orders under their shop.
+     */
+    public function cancelPurchaserOwn(Request $request, Order $order): RedirectResponse
+    {
+        $this->assertAgentOrder($request, $order);
+
+        abort_unless((int) $order->user_id === (int) $request->user()->id, 403);
+
+        try {
+            $this->orderService->cancelPendingOrderByPurchaser($request->user(), $order->fresh());
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['cancel' => $e->getMessage()]);
+        }
+
+        return back()->with('status', __('Order cancelled. Your wallet was refunded automatically.'));
+    }
+
     private function assertAgentOrder(Request $request, Order $order): void
     {
         abort_unless($request->user()->role?->slug === Role::SLUG_AGENT, 403);

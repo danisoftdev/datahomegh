@@ -219,6 +219,102 @@ class OrderTest extends TestCase
         $this->assertSame('100.00', (string) $buyer->wallet->fresh()->balance);
     }
 
+    public function test_buyer_can_cancel_pending_order_refunds_wallet_restocks(): void
+    {
+        $bundle = $this->createPlatformBundle();
+        $beforeStock = $bundle->stock_count;
+        $buyer = $this->activeBuyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ])->assertRedirect();
+
+        $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
+        $this->assertSame('95.00', (string) $buyer->wallet->fresh()->balance);
+
+        $this->actingAs($buyer)->post(route('buyer.orders.cancel', $order))
+            ->assertRedirect(route('buyer.orders.show', $order));
+
+        $order->refresh();
+        $bundle->refresh();
+        $this->assertSame('REFUNDED', $order->status);
+        $this->assertSame('100.00', (string) $buyer->wallet->fresh()->balance);
+        $this->assertSame($beforeStock, $bundle->stock_count);
+    }
+
+    public function test_buyer_cannot_cancel_after_processing(): void
+    {
+        $bundle = $this->createPlatformBundle();
+        $buyer = $this->activeBuyerWithWallet('100.00');
+        $supplier = $this->supplierUser();
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
+
+        $this->actingAs($supplier)->patch(route('admin.orders.status', $order), [
+            'status' => 'PROCESSING',
+        ])->assertRedirect();
+
+        $this->actingAs($buyer)->post(route('buyer.orders.cancel', $order))
+            ->assertRedirect()
+            ->assertSessionHasErrors('cancel');
+    }
+
+    public function test_agent_can_cancel_own_pending_checkout_refunds_wallet(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_slug' => 'agent-cancel',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $agent->id,
+            'balance' => '100.00',
+            'is_frozen' => false,
+        ]);
+
+        $platform = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Platform bundle',
+            'size_label' => '1GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $this->actingAs($agent)->post(route('agent.orders.store'), [
+            'confirm' => true,
+            'items' => [
+                [
+                    'network' => 'MTN',
+                    'phone_number' => '0244123456',
+                    'bundle_package_id' => $platform->id,
+                ],
+            ],
+        ])->assertRedirect();
+
+        $order = Order::query()->where('user_id', $agent->id)->firstOrFail();
+
+        $this->actingAs($agent)->post(route('agent.orders.cancel', $order))
+            ->assertRedirect();
+
+        $this->assertSame('REFUNDED', $order->fresh()->status);
+        $this->assertSame('100.00', (string) $agent->wallet->fresh()->balance);
+    }
+
     public function test_sent_order_cannot_be_changed(): void
     {
         $bundle = $this->createPlatformBundle();
