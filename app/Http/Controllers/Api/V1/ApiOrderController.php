@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\InsufficientBalanceException;
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\OrderService;
@@ -145,6 +146,40 @@ class ApiOrderController extends Controller
                 'orders' => $loaded,
             ],
         ], 201);
+    }
+
+    public function cancel(Request $request, Order $order): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! in_array($user->role?->slug, [Role::SLUG_BUYER, Role::SLUG_AGENT], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden',
+            ], 403);
+        }
+
+        if ((int) $order->user_id !== (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Not your order',
+            ], 403);
+        }
+
+        try {
+            $updated = $this->orderService->cancelPendingOrderByPurchaser($user, $order->fresh());
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order cancelled; wallet refunded',
+            'data' => $updated->load('bundlePackage')->toArray(),
+        ]);
     }
 
     private function bundleCatalogFor(User $user): EloquentCollection
