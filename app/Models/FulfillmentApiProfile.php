@@ -14,6 +14,7 @@ class FulfillmentApiProfile extends Model
         'name',
         'base_url',
         'api_key',
+        'default_provider_bundle_type',
         'is_active',
     ];
 

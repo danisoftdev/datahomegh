@@ -5,7 +5,7 @@
 
 @section('content')
     <p class="mb-6 max-w-2xl text-sm text-slate-400">
-        {{ __('Add one or more provider APIs per network. Only one profile can be active per network at a time—use Activate to switch. You must also edit each bundle and set Provider bundle code (e.g. mtnup2u). Without that code, orders stay in DataHome only. MTN AFA bundles are never sent to the API.') }}
+        {{ __('Add one or more provider APIs per network. Only one profile can be active per network at a time—use Activate to switch. Orders from agents (their own purchases) and platform buyers are sent to the API automatically. Agent shop buyers are not—those stay with the agent. MTN AFA bundles are never sent to the API.') }}
     </p>
 
     <div class="mb-8 max-w-xl rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
@@ -40,6 +40,14 @@
                 @enderror
             </div>
             <div>
+                <label class="mb-1 block text-sm text-slate-400">{{ __('Default provider bundle code (optional)') }}</label>
+                <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type') }}" maxlength="120" placeholder="{{ __('e.g. mtnup2u — used when a bundle has no code') }}"
+                    class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                @error('default_provider_bundle_type')
+                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('API key') }}</label>
                 <input type="password" name="api_key" value="{{ old('api_key') }}" required autocomplete="new-password" maxlength="2000"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
@@ -59,6 +67,9 @@
                         <p class="text-xs uppercase tracking-wide text-slate-500">{{ $profile->network }}</p>
                         <h3 class="text-lg font-semibold text-white">{{ $profile->name }}</h3>
                         <p class="mt-1 font-mono text-xs text-slate-400">{{ $profile->base_url }}</p>
+                        @if ($profile->default_provider_bundle_type)
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Default bundle code:') }} <span class="font-mono text-slate-300">{{ $profile->default_provider_bundle_type }}</span></p>
+                        @endif
                         @if ($profile->is_active)
                             <span class="mt-2 inline-flex rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-medium text-emerald-300">{{ __('Active for this network') }}</span>
                         @else

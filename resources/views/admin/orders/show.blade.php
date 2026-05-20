@@ -43,7 +43,7 @@
                             @if ($order->fulfillmentApiProfile)
                                 <p class="text-xs text-slate-500">{{ $order->fulfillmentApiProfile->name }} · {{ $order->fulfillmentApiProfile->base_url }}</p>
                             @elseif (! $order->provider_order_reference)
-                                <p class="text-xs text-slate-500">{{ __('Not sent yet — check bundle provider code and active API for :network.', ['network' => $order->network]) }}</p>
+                                <p class="text-xs text-slate-500">{{ __('Not sent yet — activate an API for :network and ensure a provider bundle code (bundle, API profile default, or .env fallback for that network).', ['network' => $order->network]) }}</p>
                             @endif
                         </dd>
                         <div class="mt-3 flex flex-wrap gap-2">

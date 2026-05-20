@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\BundlePackage;
 use App\Models\FulfillmentApiProfile;
 use App\Models\Order;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -20,24 +22,32 @@ final class DataPackageFulfillmentService
      */
     public function dispatchAfterOrderPlaced(Order $order): array
     {
-        $order->loadMissing('bundlePackage');
+        $order->loadMissing(['bundlePackage', 'user.role']);
+
+        if (! $this->shouldAutoDispatchToProvider($order)) {
+            return [
+                'ok' => false,
+                'message' => __('This order is handled by the agent shop and is not sent to the external API automatically.'),
+                'skipped' => true,
+            ];
+        }
 
         $bundle = $order->bundlePackage;
         if ($bundle === null || $bundle->isMtnAfaRegistration()) {
             return ['ok' => false, 'message' => __('MTN AFA orders are not sent to external APIs.'), 'skipped' => true];
         }
 
-        $bundleType = trim((string) ($bundle->provider_bundle_type ?? ''));
-        if ($bundleType === '') {
-            $msg = __('This bundle has no provider bundle code. Edit the bundle and set Provider bundle code (e.g. mtnup2u).');
+        $profile = FulfillmentApiProfile::activeForNetwork((string) $order->network);
+        if ($profile === null) {
+            $msg = __('No active API profile for network :network. Go to Data APIs and activate one.', ['network' => $order->network]);
             $this->recordDispatchError($order->id, $msg);
 
             return ['ok' => false, 'message' => $msg, 'skipped' => true];
         }
 
-        $profile = FulfillmentApiProfile::activeForNetwork((string) $order->network);
-        if ($profile === null) {
-            $msg = __('No active API profile for network :network. Go to Data APIs and activate one.', ['network' => $order->network]);
+        $bundleType = $this->resolveProviderBundleType($order, $bundle, $profile);
+        if ($bundleType === '') {
+            $msg = __('No provider bundle code for this order. Set it on the bundle or as the default on the active API profile for :network.', ['network' => $order->network]);
             $this->recordDispatchError($order->id, $msg);
 
             return ['ok' => false, 'message' => $msg, 'skipped' => true];
@@ -182,6 +192,61 @@ final class DataPackageFulfillmentService
         ]);
 
         return ['ok' => true, 'message' => __('Order sent to provider. Reference: :ref', ['ref' => $ref])];
+    }
+
+    /**
+     * Auto API: agent self-checkout and platform buyers only — not buyers linked to an agent shop.
+     */
+    private function shouldAutoDispatchToProvider(Order $order): bool
+    {
+        $user = $order->user;
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->role?->slug === Role::SLUG_AGENT) {
+            return true;
+        }
+
+        if ($user->role?->slug === Role::SLUG_BUYER) {
+            return $user->agent_id === null;
+        }
+
+        return false;
+    }
+
+    /**
+     * Prefer per-bundle code; then the active API profile default; then optional per-network config fallback (never for AFA).
+     */
+    private function resolveProviderBundleType(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile): string
+    {
+        $fromBundle = trim((string) ($bundle->provider_bundle_type ?? ''));
+        if ($fromBundle !== '') {
+            return $fromBundle;
+        }
+
+        $fromProfile = trim((string) ($profile->default_provider_bundle_type ?? ''));
+        if ($fromProfile !== '') {
+            return $fromProfile;
+        }
+
+        if ($bundle->isMtnAfaRegistration()) {
+            return '';
+        }
+
+        $network = strtoupper(trim((string) $order->network));
+        $configKey = match ($network) {
+            'MTN' => 'mtn_data_fallback_bundle_type',
+            'TELECEL' => 'telecel_data_fallback_bundle_type',
+            'AIRTELTIGO' => 'airteltigo_data_fallback_bundle_type',
+            default => null,
+        };
+
+        if ($configKey === null) {
+            return '';
+        }
+
+        return trim((string) config('datahome.fulfillment.'.$configKey, ''));
     }
 
     private function recordDispatchError(int $orderId, string $message): void

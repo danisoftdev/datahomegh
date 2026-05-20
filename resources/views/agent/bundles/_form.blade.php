@@ -31,7 +31,7 @@
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
                 placeholder="{{ __('e.g. mtnup2u') }}"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-            <p class="mt-1 text-xs text-slate-500">{{ __('Optional. Used when the supplier has an active API for this network.') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Optional. Supplier rules: bundle code first, then API profile default, then .env network fallback.') }}</p>
             @error('provider_bundle_type')
                 <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
             @enderror
