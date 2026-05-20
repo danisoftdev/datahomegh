@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BundlePackage;
 use App\Models\FulfillmentApiProfile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
@@ -170,6 +171,86 @@ class DataPackageFulfillmentTest extends TestCase
         $this->assertSame((int) $agent->id, (int) $order->agent_id);
         $this->assertNull($order->provider_order_reference);
         $this->assertNull($order->provider_dispatch_error);
+    }
+
+    #[DataProvider('normalizeBaseUrlProvider')]
+    public function test_normalize_base_url_strips_api_path_suffixes(string $input, string $expected): void
+    {
+        $this->assertSame($expected, FulfillmentApiProfile::normalizeBaseUrl($input));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function normalizeBaseUrlProvider(): array
+    {
+        return [
+            'host only' => ['https://iget.onrender.com', 'https://iget.onrender.com'],
+            'trailing slash' => ['https://iget.onrender.com/', 'https://iget.onrender.com'],
+            'full place path' => ['https://iget.onrender.com/api/developer/orders/place', 'https://iget.onrender.com'],
+            'developer root' => ['https://iget.onrender.com/api/developer', 'https://iget.onrender.com'],
+            'double api segment' => ['https://iget.onrender.com/api', 'https://iget.onrender.com/api'],
+        ];
+    }
+
+    public function test_dispatch_uses_normalized_base_url_when_profile_has_place_path(): void
+    {
+        $supplier = $this->supplier();
+
+        FulfillmentApiProfile::query()->create([
+            'supplier_user_id' => $supplier->id,
+            'network' => 'MTN',
+            'name' => 'Misconfigured URL',
+            'base_url' => 'https://provider.test/api/developer/orders/place',
+            'api_key' => 'secret-key',
+            'default_provider_bundle_type' => 'mtnup2u',
+            'is_active' => true,
+        ]);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Bundle',
+            'size_label' => '1GB',
+            'provider_bundle_type' => 'mtnup2u',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/developer/orders/place' => Http::response([
+                'success' => true,
+                'data' => ['order' => ['orderReference' => 'FIXED-REF', 'status' => 'pending']],
+            ], 200),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://provider.test/api/developer/orders/place');
+    }
+
+    public function test_admin_cannot_save_iget_console_url_as_api_base(): void
+    {
+        $supplier = $this->supplier();
+
+        $this->actingAs($supplier)->post(route('admin.fulfillment-apis.store'), [
+            'network' => 'Telecel',
+            'name' => 'Wrong host',
+            'base_url' => 'https://console.igetghana.com',
+            'api_key' => 'test-key',
+            'default_provider_bundle_type' => 'telecelup2u',
+        ])->assertSessionHasErrors('base_url');
+
+        $this->assertSame(0, FulfillmentApiProfile::query()->count());
     }
 
     public function test_data_order_dispatches_to_active_provider_and_stores_reference(): void

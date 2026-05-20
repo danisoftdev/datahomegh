@@ -7,6 +7,12 @@
     <p class="mb-6 max-w-2xl text-sm text-slate-400">
         {{ __('Add one or more provider APIs per network. Only one profile can be active per network at a time—use Activate to switch. Orders from agents (their own purchases) and platform buyers are sent to the API automatically. Agent shop buyers are not—those stay with the agent. MTN AFA bundles are never sent to the API.') }}
     </p>
+    <p class="mb-6 max-w-2xl rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+        {{ __('iGet: log in at :console. In DataHome, API base URL must be :api (not the console site). Copy your API key from the iGet developer settings.', [
+            'console' => 'https://console.igetghana.com',
+            'api' => config('datahome.fulfillment.default_provider_base_url', 'https://iget.onrender.com'),
+        ]) }}
+    </p>
 
     <div class="mb-8 max-w-xl rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
         <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Add API profile') }}</h2>
@@ -33,8 +39,9 @@
             </div>
             <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('Base URL') }}</label>
-                <input type="url" name="base_url" value="{{ old('base_url', 'https://iget.onrender.com') }}" required maxlength="512"
+                <input type="url" name="base_url" value="{{ old('base_url', config('datahome.fulfillment.default_provider_base_url', 'https://iget.onrender.com')) }}" required maxlength="512"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                <p class="mt-1 text-xs text-slate-500">{{ __('API host only (not console.igetghana.com). DataHome calls: {base}/api/developer/orders/place', ['base' => config('datahome.fulfillment.default_provider_base_url', 'https://iget.onrender.com')]) }}</p>
                 @error('base_url')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                 @enderror

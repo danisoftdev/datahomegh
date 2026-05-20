@@ -70,7 +70,7 @@ final class DataPackageFulfillmentService
             return ['ok' => false, 'message' => __('This order has no linked provider reference or API profile.')];
         }
 
-        $base = rtrim((string) $profile->base_url, '/');
+        $base = FulfillmentApiProfile::normalizeBaseUrl((string) $profile->base_url);
         $url = $base.self::STATUS_PATH_PREFIX.$ref;
 
         try {
@@ -113,7 +113,7 @@ final class DataPackageFulfillmentService
      */
     private function placeOnProvider(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile, string $bundleType): array
     {
-        $base = rtrim((string) $profile->base_url, '/');
+        $base = FulfillmentApiProfile::normalizeBaseUrl((string) $profile->base_url);
         $url = $base.self::PLACE_PATH;
         $capacity = $this->capacityForBundle($bundle);
 
@@ -147,8 +147,9 @@ final class DataPackageFulfillmentService
                 'status' => $response->status(),
                 'body' => $body,
             ]);
-            $msg = __('Provider returned HTTP :code. :body', [
+            $msg = __('Provider returned HTTP :code for :url. :body', [
                 'code' => $response->status(),
+                'url' => $url,
                 'body' => strlen($body) > 200 ? substr($body, 0, 200).'…' : $body,
             ]);
             $this->recordDispatchError($order->id, $msg);

@@ -24,6 +24,7 @@
             <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('Base URL') }}</label>
                 <input type="url" name="base_url" value="{{ old('base_url', $profile->base_url) }}" required maxlength="512" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                <p class="mt-1 text-xs text-slate-500">{{ __('API host only — not https://console.igetghana.com. Example: :api', ['api' => config('datahome.fulfillment.default_provider_base_url', 'https://iget.onrender.com')]) }}</p>
                 @error('base_url')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                 @enderror
