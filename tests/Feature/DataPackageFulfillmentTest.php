@@ -383,18 +383,18 @@ class DataPackageFulfillmentTest extends TestCase
         Http::assertSent(fn ($request) => $request['network_key'] === 'YELLO');
     }
 
-    public function test_mtn_data_uses_profile_default_when_bundle_code_missing(): void
+    public function test_mtn_data_sends_yello_even_when_bundle_stored_mtn_label(): void
     {
         $supplier = $this->supplier();
-        $this->geonetProfile($supplier, ['default_provider_bundle_type' => 'CUSTOM_KEY']);
+        $this->geonetProfile($supplier, ['default_provider_bundle_type' => 'MTN']);
 
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
             'network' => 'MTN',
             'package_kind' => 'data',
-            'name' => 'Plain Bundle',
+            'name' => 'MTN 1GB',
             'size_label' => '1GB',
-            'provider_bundle_type' => null,
+            'provider_bundle_type' => 'MTN',
             'internal_cost' => '5.00',
             'stock_count' => 10,
             'is_available' => true,
@@ -413,7 +413,7 @@ class DataPackageFulfillmentTest extends TestCase
             'confirm' => true,
         ]);
 
-        Http::assertSent(fn ($request) => $request['network_key'] === 'CUSTOM_KEY');
+        Http::assertSent(fn ($request) => $request['network_key'] === 'YELLO');
     }
 
     public function test_telecel_dispatches_to_iget_without_bundle_code_using_config_fallback(): void

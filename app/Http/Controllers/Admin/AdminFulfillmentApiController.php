@@ -50,9 +50,10 @@ class AdminFulfillmentApiController extends Controller
                 'base_url' => $this->consoleUrlNotApiMessage(),
             ])->withInput();
         }
-        $data['default_provider_bundle_type'] = filled($data['default_provider_bundle_type'] ?? null)
-            ? trim((string) $data['default_provider_bundle_type'])
-            : null;
+        $data['default_provider_bundle_type'] = $this->normalizeDefaultProductCode(
+            $data['provider_type'],
+            $data['default_provider_bundle_type'] ?? null
+        );
 
         FulfillmentApiProfile::query()->create($data);
 
@@ -81,9 +82,10 @@ class AdminFulfillmentApiController extends Controller
             ])->withInput();
         }
         $fulfillmentApiProfile->base_url = $baseUrl;
-        $fulfillmentApiProfile->default_provider_bundle_type = filled($data['default_provider_bundle_type'] ?? null)
-            ? trim((string) $data['default_provider_bundle_type'])
-            : null;
+        $fulfillmentApiProfile->default_provider_bundle_type = $this->normalizeDefaultProductCode(
+            $fulfillmentApiProfile->provider_type,
+            $data['default_provider_bundle_type'] ?? null
+        );
         $fulfillmentApiProfile->save();
 
         return back()->with('status', __('API profile updated.'));
@@ -171,5 +173,14 @@ class AdminFulfillmentApiController extends Controller
         }
 
         return $data;
+    }
+
+    private function normalizeDefaultProductCode(string $providerType, mixed $submitted): ?string
+    {
+        if ($providerType === FulfillmentProviderType::GEONET) {
+            return null;
+        }
+
+        return filled($submitted) ? trim((string) $submitted) : null;
     }
 }

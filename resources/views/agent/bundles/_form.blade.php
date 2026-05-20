@@ -25,13 +25,14 @@
         <input type="text" name="size_label" required value="{{ old('size_label', $editing ? $bundle->size_label : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
     </div>
     @php($pkgKind = old('package_kind', $editing ? ($bundle->package_kind ?? 'data') : 'data'))
-    @if ($pkgKind !== 'mtn_afa')
+    @php($bundleNetwork = old('network', $editing ? ($bundle->network ?? '') : ''))
+    @if ($pkgKind !== 'mtn_afa' && $bundleNetwork !== 'MTN')
         <div>
-            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code') }}</label>
+            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code (Telecel)') }}</label>
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
-                placeholder="{{ __('MTN: YELLO · Telecel: telecelup2u') }}"
+                placeholder="telecelup2u"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-            <p class="mt-1 text-xs text-slate-500">{{ __('Optional. Supplier rules: bundle code first, then API profile default, then .env network fallback.') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Optional iGet bundleType for Telecel resale bundles.') }}</p>
             @error('provider_bundle_type')
                 <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
             @enderror

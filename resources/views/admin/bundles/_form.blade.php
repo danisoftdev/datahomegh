@@ -26,13 +26,18 @@
         <input type="text" name="size_label" required value="{{ old('size_label', $editing ? $bundle->size_label : '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
     </div>
     @php($pkgKind = old('package_kind', $editing ? ($bundle->package_kind ?? 'data') : 'data'))
-    @if ($pkgKind !== 'mtn_afa')
-        <div>
-            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider product code') }}</label>
+    @php($bundleNetwork = old('network', $editing ? ($bundle->network ?? '') : ''))
+    @if ($pkgKind !== 'mtn_afa' && $bundleNetwork === 'MTN')
+        <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+            {{ __('MTN data orders use Geonettech automatically (network_key :key). You only manage the network name customers see — no provider code on this bundle.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}
+        </p>
+    @elseif ($pkgKind !== 'mtn_afa')
+        <div id="provider-code-field">
+            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code (Telecel / iGet)') }}</label>
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
-                placeholder="{{ __('MTN: YELLO · Telecel: telecelup2u') }}"
+                placeholder="telecelup2u"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-            <p class="mt-1 text-xs text-slate-500">{{ __('MTN = Geonettech network_key. Telecel = iGet bundleType. Used before the active API profile default, then .env fallbacks (FULFILLMENT_GEONET_MTN_NETWORK_KEY / FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE).') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('iGet bundleType for Telecel. Optional if set on the Telecel API profile or .env (FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE).') }}</p>
             @error('provider_bundle_type')
                 <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
             @enderror

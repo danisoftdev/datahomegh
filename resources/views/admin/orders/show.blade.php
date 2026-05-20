@@ -19,8 +19,11 @@
                 <div><dt class="text-slate-500">{{ __('Agent') }}</dt><dd>{{ $order->agent?->username ?? '—' }}</dd></div>
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}
                     @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
-                        <span class="block text-xs text-slate-500">{{ __('Provider code') }}:
-                            {{ $order->bundlePackage->provider_bundle_type ?: __('not set') }}</span>
+                        @if ($order->network === 'MTN')
+                            <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
+                        @elseif ($order->bundlePackage->provider_bundle_type)
+                            <span class="block text-xs text-slate-500">{{ __('Provider code') }}: {{ $order->bundlePackage->provider_bundle_type }}</span>
+                        @endif
                     @endif
                 </dd></div>
                 @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
