@@ -5,7 +5,7 @@
 
 @section('content')
     <p class="mb-6 max-w-2xl text-sm text-slate-400">
-        {{ __('Add one or more provider APIs per network. Only one profile can be active per network at a time—use Activate to switch. When a bundle has a provider bundle code and an API is active for that network, new data orders are sent automatically after checkout (same paths as buyer/agent orders). MTN AFA bundles are never sent to the API.') }}
+        {{ __('Add one or more provider APIs per network. Only one profile can be active per network at a time—use Activate to switch. You must also edit each bundle and set Provider bundle code (e.g. mtnup2u). Without that code, orders stay in DataHome only. MTN AFA bundles are never sent to the API.') }}
     </p>
 
     <div class="mb-8 max-w-xl rounded-xl border border-white/10 bg-[#16213E]/80 p-6">

@@ -17,11 +17,19 @@
                 <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $order->phone_number }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Buyer') }}</dt><dd>{{ $order->user?->username }} (#{{ $order->user_id }})</dd></div>
                 <div><dt class="text-slate-500">{{ __('Agent') }}</dt><dd>{{ $order->agent?->username ?? '—' }}</dd></div>
-                <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}</dd></div>
-                @if ($order->provider_order_reference || $order->provider_status || $order->fulfillment_api_profile_id)
+                <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}
+                    @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
+                        <span class="block text-xs text-slate-500">{{ __('Provider code') }}:
+                            {{ $order->bundlePackage->provider_bundle_type ?: __('not set') }}</span>
+                    @endif
+                </dd></div>
+                @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
                     <div class="sm:col-span-2 border-t border-white/10 pt-3">
                         <dt class="text-slate-500">{{ __('External provider') }}</dt>
                         <dd class="mt-1 space-y-1 text-sm">
+                            @if ($order->provider_dispatch_error)
+                                <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">{{ $order->provider_dispatch_error }}</p>
+                            @endif
                             @if ($order->provider_order_reference)
                                 <p><span class="text-slate-500">{{ __('Reference') }}:</span> <span class="font-mono text-white">{{ $order->provider_order_reference }}</span></p>
                             @endif
@@ -34,14 +42,24 @@
                             @endif
                             @if ($order->fulfillmentApiProfile)
                                 <p class="text-xs text-slate-500">{{ $order->fulfillmentApiProfile->name }} · {{ $order->fulfillmentApiProfile->base_url }}</p>
+                            @elseif (! $order->provider_order_reference)
+                                <p class="text-xs text-slate-500">{{ __('Not sent yet — check bundle provider code and active API for :network.', ['network' => $order->network]) }}</p>
                             @endif
                         </dd>
-                        @if ($order->provider_order_reference && $order->fulfillment_api_profile_id)
-                            <form method="post" action="{{ route('admin.orders.refresh-provider-status', $order) }}" class="mt-3">
-                                @csrf
-                                <button type="submit" class="rounded-lg border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/5">{{ __('Refresh status from provider') }}</button>
-                            </form>
-                        @endif
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @if (! $order->provider_order_reference)
+                                <form method="post" action="{{ route('admin.orders.dispatch-to-provider', $order) }}">
+                                    @csrf
+                                    <button type="submit" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E]">{{ __('Send to provider now') }}</button>
+                                </form>
+                            @endif
+                            @if ($order->provider_order_reference && $order->fulfillment_api_profile_id)
+                                <form method="post" action="{{ route('admin.orders.refresh-provider-status', $order) }}">
+                                    @csrf
+                                    <button type="submit" class="rounded-lg border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/5">{{ __('Refresh status from provider') }}</button>
+                                </form>
+                            @endif
+                        </div>
                     </div>
                 @endif
             </dl>

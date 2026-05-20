@@ -35,10 +35,9 @@ class FulfillmentApiProfile extends Model
         return $this->hasMany(Order::class);
     }
 
-    public static function activeForSupplierNetwork(int $supplierUserId, string $network): ?self
+    public static function activeForNetwork(string $network): ?self
     {
         return self::query()
-            ->where('supplier_user_id', $supplierUserId)
             ->where('network', $network)
             ->where('is_active', true)
             ->first();
