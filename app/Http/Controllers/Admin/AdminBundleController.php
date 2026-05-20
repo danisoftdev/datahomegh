@@ -137,7 +137,8 @@ class AdminBundleController extends Controller
             ? trim((string) $data['provider_bundle_type'])
             : null;
 
-        if (($data['package_kind'] ?? '') === BundlePackageKind::MTN_AFA || $data['network'] === 'MTN') {
+        if (($data['package_kind'] ?? '') === BundlePackageKind::MTN_AFA
+            || in_array($data['network'], ['MTN', 'Telecel'], true)) {
             $data['provider_bundle_type'] = null;
         }
 

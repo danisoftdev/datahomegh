@@ -177,7 +177,7 @@ class AdminFulfillmentApiController extends Controller
 
     private function normalizeDefaultProductCode(string $providerType, mixed $submitted): ?string
     {
-        if ($providerType === FulfillmentProviderType::GEONET) {
+        if (in_array($providerType, [FulfillmentProviderType::GEONET, FulfillmentProviderType::IGET], true)) {
             return null;
         }
 

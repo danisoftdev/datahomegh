@@ -81,7 +81,7 @@ class DataPackageFulfillmentTest extends TestCase
             'name' => 'iGet Telecel',
             'base_url' => 'https://provider.test',
             'api_key' => 'iget-key',
-            'default_provider_bundle_type' => 'telecelup2u',
+            'default_provider_bundle_type' => 'Telecel-5959',
             'is_active' => true,
         ], $overrides));
     }
@@ -284,7 +284,7 @@ class DataPackageFulfillmentTest extends TestCase
             'name' => 'Wrong host',
             'base_url' => 'https://console.igetghana.com',
             'api_key' => 'test-key',
-            'default_provider_bundle_type' => 'telecelup2u',
+            'default_provider_bundle_type' => 'Telecel-5959',
         ])->assertSessionHasErrors('base_url');
 
         $this->assertSame(0, FulfillmentApiProfile::query()->count());
@@ -416,12 +416,10 @@ class DataPackageFulfillmentTest extends TestCase
         Http::assertSent(fn ($request) => $request['network_key'] === 'YELLO');
     }
 
-    public function test_telecel_dispatches_to_iget_without_bundle_code_using_config_fallback(): void
+    public function test_telecel_dispatches_to_iget_with_config_bundle_type(): void
     {
-        Config::set('datahome.fulfillment.fallback_codes.iget.TELECEL', 'telecel_fb_code');
-
         $supplier = $this->supplier();
-        $this->igetProfile($supplier, ['default_provider_bundle_type' => null]);
+        $this->igetProfile($supplier);
 
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
@@ -451,16 +449,54 @@ class DataPackageFulfillmentTest extends TestCase
             'confirm' => true,
         ]);
 
-        Http::assertSent(fn ($request) => $request['bundleType'] === 'telecel_fb_code');
+        Http::assertSent(fn ($request) => $request['bundleType'] === 'Telecel-5959');
         $this->assertSame('TEL-REF', Order::query()->latest('id')->value('provider_order_reference'));
     }
 
-    public function test_telecel_stays_without_codes_when_fallback_empty(): void
+    public function test_telecel_sends_telecel_5959_even_when_bundle_stored_old_code(): void
+    {
+        Config::set('datahome.fulfillment.fallback_codes.iget.TELECEL', 'Telecel-5959');
+
+        $supplier = $this->supplier();
+        $this->igetProfile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'Telecel',
+            'package_kind' => 'data',
+            'name' => 'Telecel 2GB',
+            'size_label' => '2GB',
+            'provider_bundle_type' => 'telecelup2u',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/developer/orders/place' => Http::response([
+                'success' => true,
+                'data' => ['order' => ['orderReference' => 'TEL-2', 'status' => 'pending']],
+            ], 200),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'Telecel',
+            'phone_number' => '0200000000',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        Http::assertSent(fn ($request) => $request['bundleType'] === 'Telecel-5959' && $request['capacity'] === 2);
+    }
+
+    public function test_telecel_stays_without_dispatch_when_bundle_type_not_configured(): void
     {
         Config::set('datahome.fulfillment.fallback_codes.iget.TELECEL', '');
 
         $supplier = $this->supplier();
-        $this->igetProfile($supplier, ['default_provider_bundle_type' => null]);
+        $this->igetProfile($supplier);
 
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
@@ -491,12 +527,12 @@ class DataPackageFulfillmentTest extends TestCase
         $this->assertNotNull($order->provider_dispatch_error);
     }
 
-    public function test_admin_dispatch_to_provider_shows_error_when_telecel_bundle_code_missing(): void
+    public function test_admin_dispatch_fails_when_telecel_bundle_type_not_configured(): void
     {
         Config::set('datahome.fulfillment.fallback_codes.iget.TELECEL', '');
 
         $supplier = $this->supplier();
-        $this->igetProfile($supplier, ['default_provider_bundle_type' => null]);
+        $this->igetProfile($supplier);
 
         $bundle = BundlePackage::query()->create([
             'agent_id' => null,
@@ -525,7 +561,7 @@ class DataPackageFulfillmentTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('error');
 
-        $this->assertStringContainsString('bundle code', strtolower((string) $order->fresh()->provider_dispatch_error));
+        $this->assertStringContainsString('bundletype', strtolower((string) $order->fresh()->provider_dispatch_error));
     }
 
     public function test_admin_can_refresh_geonet_provider_status(): void

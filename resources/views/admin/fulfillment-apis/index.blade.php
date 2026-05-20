@@ -11,9 +11,10 @@
     <div class="mb-6 grid max-w-2xl gap-4 sm:grid-cols-2">
         <p class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
             <strong class="text-amber-200">{{ __('Telecel — iGet') }}</strong><br>
-            {{ __('Dashboard: :console. API base: :api. Auth: X-API-Key. Product field: bundleType (e.g. telecelup2u).', [
+            {{ __('Dashboard: :console. API base: :api. Auth: X-API-Key. Telecel bundleType is automatic (:type).', [
                 'console' => 'https://console.igetghana.com',
                 'api' => config('datahome.fulfillment.providers.iget.default_base_url'),
+                'type' => \App\Support\IgetTelecelBundleType::resolve(),
             ]) }}
         </p>
         <p class="rounded-lg border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm text-sky-100">
@@ -76,7 +77,7 @@
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                 @enderror
             </div>
-            <p id="geonet_auto_key_note" class="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400"></p>
+            <p id="provider_auto_key_note" class="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400"></p>
             <div>
                 <label class="mb-1 block text-sm text-slate-400" id="api_key_label">{{ __('API key / token') }}</label>
                 <input type="password" name="api_key" value="{{ old('api_key') }}" required autocomplete="new-password" maxlength="2000"
@@ -95,17 +96,15 @@
                 iget: {
                     network: 'Telecel',
                     baseUrl: @json(config('datahome.fulfillment.providers.iget.default_base_url')),
-                    codePlaceholder: 'telecelup2u',
                     baseHint: @json(__('iGet API host only (not console.igetghana.com). Calls: {base}/api/developer/orders/place')),
-                    codeHint: @json(__('iGet bundleType — used when bundles have no code.')),
+                    autoKeyNote: @json(__('Telecel bundleType :type is applied automatically for all Telecel data orders.', ['type' => \App\Support\IgetTelecelBundleType::resolve()])),
                     keyLabel: @json(__('iGet API key (X-API-Key)')),
                 },
                 geonet: {
                     network: 'MTN',
                     baseUrl: @json(config('datahome.fulfillment.providers.geonet.default_base_url')),
-                    codePlaceholder: 'YELLO',
                     baseHint: @json(__('Geonettech API base. Calls: {base}/v1/place-order')),
-                    codeHint: @json(__('Geonettech network_key — used when bundles have no code.')),
+                    autoKeyNote: @json(__('MTN uses Geonettech network_key :key automatically — no code field needed.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()])),
                     keyLabel: @json(__('Geonettech Bearer token')),
                 },
             };
@@ -118,11 +117,10 @@
             const codeEl = document.getElementById('default_provider_bundle_type');
             const codeHintEl = document.getElementById('default_code_hint');
             const codeLabelEl = document.getElementById('default_code_label');
-            const geonetNote = document.getElementById('geonet_auto_key_note');
+            const providerNote = document.getElementById('provider_auto_key_note');
             const keyLabelEl = document.getElementById('api_key_label');
 
             function sync() {
-                const isGeonet = providerEl.value === 'geonet';
                 const p = defaults[providerEl.value] || defaults.geonet;
                 networkEl.value = p.network;
                 networkEl.querySelectorAll('option').forEach((opt) => {
@@ -134,19 +132,10 @@
                 }
                 baseHintEl.textContent = p.baseHint.replace('{base}', baseUrlEl.value || p.baseUrl);
                 keyLabelEl.textContent = p.keyLabel;
-                if (isGeonet) {
-                    codeWrap.classList.add('hidden');
-                    codeEl.removeAttribute('name');
-                    geonetNote.textContent = p.autoKeyNote || '';
-                    geonetNote.classList.remove('hidden');
-                } else {
-                    codeWrap.classList.remove('hidden');
-                    codeEl.setAttribute('name', 'default_provider_bundle_type');
-                    geonetNote.classList.add('hidden');
-                    codeEl.placeholder = p.codePlaceholder || 'telecelup2u';
-                    codeHintEl.textContent = p.codeHint || '';
-                    codeLabelEl.textContent = @json(__('Default bundleType (optional)'));
-                }
+                codeWrap.classList.add('hidden');
+                codeEl.removeAttribute('name');
+                providerNote.textContent = p.autoKeyNote || '';
+                providerNote.classList.remove('hidden');
             }
 
             providerEl.addEventListener('change', () => {
@@ -171,11 +160,8 @@
                         <p class="mt-1 font-mono text-xs text-slate-400">{{ $profile->base_url }}</p>
                         @if ($profile->isGeonet())
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN API key:') }} <span class="font-mono text-slate-300">{{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span></p>
-                        @elseif ($profile->default_provider_bundle_type)
-                            <p class="mt-1 text-xs text-slate-500">
-                                {{ __('Default bundleType:') }}
-                                <span class="font-mono text-slate-300">{{ $profile->default_provider_bundle_type }}</span>
-                            </p>
+                        @elseif ($profile->isIget())
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Telecel bundleType:') }} <span class="font-mono text-slate-300">{{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span></p>
                         @endif
                         @if ($profile->is_active)
                             <span class="mt-2 inline-flex rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-medium text-emerald-300">{{ __('Active for this network') }}</span>

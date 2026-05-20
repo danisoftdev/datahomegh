@@ -11,6 +11,7 @@ use App\Services\Fulfillment\GeonetFulfillmentClient;
 use App\Services\Fulfillment\IgetFulfillmentClient;
 use App\Support\FulfillmentProviderType;
 use App\Support\GeonetMtnNetworkKey;
+use App\Support\IgetTelecelBundleType;
 
 final class DataPackageFulfillmentService
 {
@@ -148,6 +149,13 @@ final class DataPackageFulfillmentService
             return GeonetMtnNetworkKey::resolve();
         }
 
+        if ($profile->provider_type === FulfillmentProviderType::IGET
+            && IgetTelecelBundleType::isTelecelNetwork((string) $order->network)) {
+            $resolved = IgetTelecelBundleType::resolve();
+
+            return $resolved !== '' ? $resolved : '';
+        }
+
         $fromBundle = trim((string) ($bundle->provider_bundle_type ?? ''));
         if ($fromBundle !== '') {
             return $fromBundle;
@@ -168,7 +176,7 @@ final class DataPackageFulfillmentService
     {
         return match ($profile->provider_type) {
             FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
-            FulfillmentProviderType::IGET => __('No iGet bundle code for this order. Set it on the bundle or as the default on the Telecel API profile (e.g. telecelup2u).'),
+            FulfillmentProviderType::IGET => __('iGet Telecel bundleType is not configured. Set FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE in .env (default Telecel-5959).'),
             default => __('No provider product code configured for this order.'),
         };
     }

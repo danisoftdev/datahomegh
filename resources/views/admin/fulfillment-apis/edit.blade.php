@@ -45,16 +45,9 @@
                     {{ __('MTN Geonettech network_key (:key) is applied automatically for all MTN data orders.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}
                 </p>
             @else
-                <div>
-                    <label class="mb-1 block text-sm text-slate-400">{{ __('Default bundleType (optional)') }}</label>
-                    <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type', $profile->default_provider_bundle_type ?? '') }}" maxlength="120"
-                        placeholder="telecelup2u"
-                        class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-                    <p class="mt-1 text-xs text-slate-500">{{ __('Used when a Telecel bundle has no provider code.') }}</p>
-                    @error('default_provider_bundle_type')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
+                <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+                    {{ __('Telecel iGet bundleType (:type) is applied automatically for all Telecel data orders.', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}
+                </p>
             @endif
             <div>
                 <label class="mb-1 block text-sm text-slate-400">
