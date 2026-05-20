@@ -29,7 +29,7 @@
         <div>
             <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code') }}</label>
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
-                placeholder="{{ __('e.g. mtnup2u') }}"
+                placeholder="{{ __('MTN: YELLO · Telecel: telecelup2u') }}"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
             <p class="mt-1 text-xs text-slate-500">{{ __('Optional. Supplier rules: bundle code first, then API profile default, then .env network fallback.') }}</p>
             @error('provider_bundle_type')

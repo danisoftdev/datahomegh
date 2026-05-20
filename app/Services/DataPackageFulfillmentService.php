@@ -7,15 +7,16 @@ use App\Models\FulfillmentApiProfile;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Throwable;
+use App\Services\Fulfillment\GeonetFulfillmentClient;
+use App\Services\Fulfillment\IgetFulfillmentClient;
+use App\Support\FulfillmentProviderType;
 
 final class DataPackageFulfillmentService
 {
-    private const PLACE_PATH = '/api/developer/orders/place';
-
-    private const STATUS_PATH_PREFIX = '/api/developer/orders/reference/';
+    public function __construct(
+        private readonly IgetFulfillmentClient $igetClient,
+        private readonly GeonetFulfillmentClient $geonetClient,
+    ) {}
 
     /**
      * @return array{ok: bool, message: string, skipped?: bool}
@@ -45,15 +46,42 @@ final class DataPackageFulfillmentService
             return ['ok' => false, 'message' => $msg, 'skipped' => true];
         }
 
-        $bundleType = $this->resolveProviderBundleType($order, $bundle, $profile);
-        if ($bundleType === '') {
-            $msg = __('No provider bundle code for this order. Set it on the bundle or as the default on the active API profile for :network.', ['network' => $order->network]);
+        if (! FulfillmentProviderType::allowsNetwork($profile->provider_type, (string) $order->network)) {
+            $msg = __('The active API profile provider does not match network :network.', ['network' => $order->network]);
             $this->recordDispatchError($order->id, $msg);
 
             return ['ok' => false, 'message' => $msg, 'skipped' => true];
         }
 
-        return $this->placeOnProvider($order, $bundle, $profile, $bundleType);
+        $productCode = $this->resolveProductCode($order, $bundle, $profile);
+        if ($productCode === '') {
+            $msg = $this->missingProductCodeMessage($profile);
+            $this->recordDispatchError($order->id, $msg);
+
+            return ['ok' => false, 'message' => $msg, 'skipped' => true];
+        }
+
+        $result = match ($profile->provider_type) {
+            FulfillmentProviderType::IGET => $this->igetClient->place($order, $bundle, $profile, $productCode),
+            FulfillmentProviderType::GEONET => $this->geonetClient->place($order, $bundle, $profile, $productCode),
+            default => ['ok' => false, 'message' => __('Unknown API provider type.')],
+        };
+
+        if (! $result['ok']) {
+            $this->recordDispatchError($order->id, $result['message']);
+
+            return $result;
+        }
+
+        Order::query()->whereKey($order->id)->update([
+            'provider_order_reference' => $result['reference'] ?? null,
+            'fulfillment_api_profile_id' => $profile->id,
+            'provider_status' => $result['status'] ?? null,
+            'provider_status_synced_at' => now(),
+            'provider_dispatch_error' => null,
+        ]);
+
+        return $result;
     }
 
     /**
@@ -70,129 +98,22 @@ final class DataPackageFulfillmentService
             return ['ok' => false, 'message' => __('This order has no linked provider reference or API profile.')];
         }
 
-        $base = FulfillmentApiProfile::normalizeBaseUrl((string) $profile->base_url);
-        $url = $base.self::STATUS_PATH_PREFIX.$ref;
+        $result = match ($profile->provider_type) {
+            FulfillmentProviderType::IGET => $this->igetClient->refreshStatus($order, $profile, $ref),
+            FulfillmentProviderType::GEONET => $this->geonetClient->refreshStatus($order, $profile, $ref),
+            default => ['ok' => false, 'message' => __('Unknown API provider type.')],
+        };
 
-        try {
-            $response = Http::timeout(25)
-                ->withHeaders([
-                    'X-API-Key' => (string) $profile->api_key,
-                    'Accept' => 'application/json',
-                ])
-                ->get($url);
-        } catch (Throwable $e) {
-            Log::warning('data_package_fulfillment_status_request_failed', [
-                'order_id' => $order->id,
-                'message' => $e->getMessage(),
-            ]);
-
-            return ['ok' => false, 'message' => __('Could not reach provider: :msg', ['msg' => $e->getMessage()])];
-        }
-
-        if (! $response->successful()) {
-            return ['ok' => false, 'message' => __('Provider returned HTTP :code.', ['code' => $response->status()])];
-        }
-
-        $json = $response->json();
-        if (! is_array($json) || empty($json['success'])) {
-            return ['ok' => false, 'message' => __('Provider did not confirm success.')];
-        }
-
-        $status = $this->extractNested($json, ['data', 'order', 'status']);
-
-        Order::query()->whereKey($order->id)->update([
-            'provider_status' => $status,
-            'provider_status_synced_at' => now(),
-        ]);
-
-        return ['ok' => true, 'message' => __('Provider status updated.')];
-    }
-
-    /**
-     * @return array{ok: bool, message: string}
-     */
-    private function placeOnProvider(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile, string $bundleType): array
-    {
-        $base = FulfillmentApiProfile::normalizeBaseUrl((string) $profile->base_url);
-        $url = $base.self::PLACE_PATH;
-        $capacity = $this->capacityForBundle($bundle);
-
-        try {
-            $response = Http::timeout(25)
-                ->withHeaders([
-                    'X-API-Key' => (string) $profile->api_key,
-                    'Accept' => 'application/json',
-                ])
-                ->asJson()
-                ->post($url, [
-                    'recipientNumber' => (string) $order->phone_number,
-                    'capacity' => $capacity,
-                    'bundleType' => $bundleType,
-                ]);
-        } catch (Throwable $e) {
-            Log::warning('data_package_fulfillment_place_request_failed', [
-                'order_id' => $order->id,
-                'message' => $e->getMessage(),
-            ]);
-            $msg = __('Could not reach provider: :msg', ['msg' => $e->getMessage()]);
-            $this->recordDispatchError($order->id, $msg);
-
-            return ['ok' => false, 'message' => $msg];
-        }
-
-        if (! $response->successful()) {
-            $body = $response->body();
-            Log::warning('data_package_fulfillment_place_http_error', [
-                'order_id' => $order->id,
-                'status' => $response->status(),
-                'body' => $body,
-            ]);
-            $msg = __('Provider returned HTTP :code for :url. :body', [
-                'code' => $response->status(),
-                'url' => $url,
-                'body' => strlen($body) > 200 ? substr($body, 0, 200).'…' : $body,
-            ]);
-            $this->recordDispatchError($order->id, $msg);
-
-            return ['ok' => false, 'message' => $msg];
-        }
-
-        $json = $response->json();
-        if (! is_array($json) || empty($json['success'])) {
-            $providerMsg = is_array($json) ? (string) ($json['message'] ?? '') : '';
-            Log::warning('data_package_fulfillment_place_unsuccessful', [
-                'order_id' => $order->id,
-                'json' => $json,
-            ]);
-            $msg = $providerMsg !== ''
-                ? __('Provider rejected the order: :msg', ['msg' => $providerMsg])
-                : __('Provider did not return success.');
-            $this->recordDispatchError($order->id, $msg);
-
-            return ['ok' => false, 'message' => $msg];
-        }
-
-        $ref = $this->extractOrderReference($json);
-        if ($ref === null || $ref === '') {
-            Log::warning('data_package_fulfillment_missing_order_reference', [
-                'order_id' => $order->id,
-                'json' => $json,
-            ]);
-            $msg = __('Provider accepted the order but did not return an order reference.');
-            $this->recordDispatchError($order->id, $msg);
-
-            return ['ok' => false, 'message' => $msg];
+        if (! $result['ok']) {
+            return $result;
         }
 
         Order::query()->whereKey($order->id)->update([
-            'provider_order_reference' => $ref,
-            'fulfillment_api_profile_id' => $profile->id,
-            'provider_status' => $this->extractNested($json, ['data', 'order', 'status']),
+            'provider_status' => $result['status'] ?? null,
             'provider_status_synced_at' => now(),
-            'provider_dispatch_error' => null,
         ]);
 
-        return ['ok' => true, 'message' => __('Order sent to provider. Reference: :ref', ['ref' => $ref])];
+        return $result;
     }
 
     /**
@@ -217,9 +138,9 @@ final class DataPackageFulfillmentService
     }
 
     /**
-     * Prefer per-bundle code; then the active API profile default; then optional per-network config fallback (never for AFA).
+     * bundleType (iGet) or network_key (Geonettech).
      */
-    private function resolveProviderBundleType(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile): string
+    private function resolveProductCode(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile): string
     {
         $fromBundle = trim((string) ($bundle->provider_bundle_type ?? ''));
         if ($fromBundle !== '') {
@@ -231,23 +152,19 @@ final class DataPackageFulfillmentService
             return $fromProfile;
         }
 
-        if ($bundle->isMtnAfaRegistration()) {
-            return '';
-        }
+        return trim((string) config(
+            'datahome.fulfillment.fallback_codes.'.$profile->provider_type.'.'.strtoupper((string) $order->network),
+            ''
+        ));
+    }
 
-        $network = strtoupper(trim((string) $order->network));
-        $configKey = match ($network) {
-            'MTN' => 'mtn_data_fallback_bundle_type',
-            'TELECEL' => 'telecel_data_fallback_bundle_type',
-            'AIRTELTIGO' => 'airteltigo_data_fallback_bundle_type',
-            default => null,
+    private function missingProductCodeMessage(FulfillmentApiProfile $profile): string
+    {
+        return match ($profile->provider_type) {
+            FulfillmentProviderType::GEONET => __('No Geonettech network_key for this order. Set it on the bundle or as the default on the MTN API profile (e.g. YELLO).'),
+            FulfillmentProviderType::IGET => __('No iGet bundle code for this order. Set it on the bundle or as the default on the Telecel API profile (e.g. telecelup2u).'),
+            default => __('No provider product code configured for this order.'),
         };
-
-        if ($configKey === null) {
-            return '';
-        }
-
-        return trim((string) config('datahome.fulfillment.'.$configKey, ''));
     }
 
     private function recordDispatchError(int $orderId, string $message): void
@@ -255,43 +172,5 @@ final class DataPackageFulfillmentService
         Order::query()->whereKey($orderId)->update([
             'provider_dispatch_error' => $message,
         ]);
-    }
-
-    private function capacityForBundle(BundlePackage $bundle): int
-    {
-        if (preg_match('/(\d+)/', (string) $bundle->size_label, $matches)) {
-            return max(1, (int) $matches[1]);
-        }
-
-        return 1;
-    }
-
-    /**
-     * @param  array<string, mixed>  $json
-     */
-    private function extractOrderReference(array $json): ?string
-    {
-        $ref = data_get($json, 'data.order.orderReference');
-        if (is_string($ref) && $ref !== '') {
-            return $ref;
-        }
-
-        $alt = data_get($json, 'data.order.reference');
-        if (is_string($alt) && $alt !== '') {
-            return $alt;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $json
-     * @param  list<string>  $path
-     */
-    private function extractNested(array $json, array $path): ?string
-    {
-        $v = data_get($json, implode('.', $path));
-
-        return is_string($v) && $v !== '' ? $v : null;
     }
 }

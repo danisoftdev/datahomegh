@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FulfillmentApiProfile;
+use App\Support\FulfillmentProviderType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +24,9 @@ class AdminFulfillmentApiController extends Controller
             ->orderBy('name')
             ->get();
 
-        $networks = ['MTN', 'Telecel', 'AirtelTigo'];
-
         return view('admin.fulfillment-apis.index', [
             'profiles' => $profiles,
-            'networks' => $networks,
+            'providerTypes' => FulfillmentProviderType::labels(),
         ]);
     }
 
@@ -45,17 +44,15 @@ class AdminFulfillmentApiController extends Controller
         $data = $this->validatedCreate($request);
         $data['supplier_user_id'] = (int) $request->user()->id;
         $data['is_active'] = false;
-        $data['base_url'] = $this->normalizeAndValidateBaseUrl($data['base_url']);
+        $data['base_url'] = $this->normalizeBaseUrlForProvider($data['provider_type'], $data['base_url']);
         if ($data['base_url'] === null) {
             return back()->withErrors([
                 'base_url' => $this->consoleUrlNotApiMessage(),
             ])->withInput();
         }
-        if (isset($data['default_provider_bundle_type']) && $data['default_provider_bundle_type'] !== null && $data['default_provider_bundle_type'] !== '') {
-            $data['default_provider_bundle_type'] = trim((string) $data['default_provider_bundle_type']);
-        } else {
-            $data['default_provider_bundle_type'] = null;
-        }
+        $data['default_provider_bundle_type'] = filled($data['default_provider_bundle_type'] ?? null)
+            ? trim((string) $data['default_provider_bundle_type'])
+            : null;
 
         FulfillmentApiProfile::query()->create($data);
 
@@ -77,7 +74,7 @@ class AdminFulfillmentApiController extends Controller
             $fulfillmentApiProfile->api_key = $data['api_key'];
         }
         $fulfillmentApiProfile->name = $data['name'];
-        $baseUrl = $this->normalizeAndValidateBaseUrl($data['base_url']);
+        $baseUrl = $this->normalizeBaseUrlForProvider($fulfillmentApiProfile->provider_type, $data['base_url']);
         if ($baseUrl === null) {
             return back()->withErrors([
                 'base_url' => $this->consoleUrlNotApiMessage(),
@@ -123,15 +120,20 @@ class AdminFulfillmentApiController extends Controller
     }
 
     /**
-     * @return string|null Normalized API host, or null if user entered the web console URL.
+     * @return string|null Normalized base URL, or null if user entered the iGet web console URL.
      */
-    private function normalizeAndValidateBaseUrl(string $baseUrl): ?string
+    private function normalizeBaseUrlForProvider(string $providerType, string $baseUrl): ?string
     {
-        $normalized = FulfillmentApiProfile::normalizeBaseUrl($baseUrl);
-        $host = strtolower((string) parse_url($normalized, PHP_URL_HOST));
+        $normalized = match ($providerType) {
+            FulfillmentProviderType::GEONET => FulfillmentApiProfile::normalizeGeonetBaseUrl($baseUrl),
+            default => FulfillmentApiProfile::normalizeBaseUrl($baseUrl),
+        };
 
-        if ($host === 'console.igetghana.com' || str_starts_with($host, 'console.')) {
-            return null;
+        if ($providerType === FulfillmentProviderType::IGET) {
+            $host = strtolower((string) parse_url($normalized, PHP_URL_HOST));
+            if ($host === 'console.igetghana.com' || str_starts_with($host, 'console.')) {
+                return null;
+            }
         }
 
         return $normalized;
@@ -141,21 +143,33 @@ class AdminFulfillmentApiController extends Controller
     {
         return __(':console is the iGet website login, not the API server. Use API base URL :api (from your iGet developer docs), then Activate your profile.', [
             'console' => 'https://console.igetghana.com',
-            'api' => 'https://iget.onrender.com',
+            'api' => FulfillmentApiProfile::defaultBaseUrl(FulfillmentProviderType::IGET),
         ]);
     }
 
     /**
-     * @return array{name: string, network: string, base_url: string, api_key: string, default_provider_bundle_type?: string|null}
+     * @return array{provider_type: string, name: string, network: string, base_url: string, api_key: string, default_provider_bundle_type?: string|null}
      */
     private function validatedCreate(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
+            'provider_type' => ['required', Rule::in(FulfillmentProviderType::all())],
             'network' => ['required', Rule::in(['MTN', 'Telecel', 'AirtelTigo'])],
             'name' => ['required', 'string', 'max:120'],
             'base_url' => ['required', 'url', 'max:512'],
             'api_key' => ['required', 'string', 'max:2000'],
             'default_provider_bundle_type' => ['nullable', 'string', 'max:120'],
         ]);
+
+        if (! FulfillmentProviderType::allowsNetwork($data['provider_type'], $data['network'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'network' => __(':provider only supports :networks.', [
+                    'provider' => FulfillmentProviderType::labels()[$data['provider_type']] ?? $data['provider_type'],
+                    'networks' => implode(', ', FulfillmentProviderType::networksFor($data['provider_type'])),
+                ]),
+            ]);
+        }
+
+        return $data;
     }
 }
