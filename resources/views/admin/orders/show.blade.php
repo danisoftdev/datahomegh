@@ -21,6 +21,8 @@
                     @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
                         @if ($order->network === 'MTN')
                             <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
+                        @elseif ($order->network === 'Telecel')
+                            <span class="block text-xs text-slate-500">{{ __('iGet') }}: {{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span>
                         @elseif ($order->bundlePackage->provider_bundle_type)
                             <span class="block text-xs text-slate-500">{{ __('Provider code') }}: {{ $order->bundlePackage->provider_bundle_type }}</span>
                         @endif

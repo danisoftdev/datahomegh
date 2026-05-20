@@ -31,13 +31,15 @@
         <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
             {{ __('MTN data orders use Geonettech automatically (network_key :key). You only manage the network name customers see — no provider code on this bundle.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}
         </p>
+    @elseif ($pkgKind !== 'mtn_afa' && $bundleNetwork === 'Telecel')
+        <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+            {{ __('Telecel data orders use iGet automatically (bundleType :type). Match size labels to iGet (e.g. 1GB, 2GB) — no provider code on this bundle.', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}
+        </p>
     @elseif ($pkgKind !== 'mtn_afa')
         <div id="provider-code-field">
-            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code (Telecel / iGet)') }}</label>
+            <label class="mb-1 block text-sm text-slate-400">{{ __('Provider bundle code') }}</label>
             <input type="text" name="provider_bundle_type" value="{{ old('provider_bundle_type', $editing ? ($bundle->provider_bundle_type ?? '') : '') }}" maxlength="120"
-                placeholder="telecelup2u"
                 class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-            <p class="mt-1 text-xs text-slate-500">{{ __('iGet bundleType for Telecel. Optional if set on the Telecel API profile or .env (FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE).') }}</p>
             @error('provider_bundle_type')
                 <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
             @enderror
