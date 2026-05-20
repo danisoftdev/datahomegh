@@ -45,7 +45,12 @@ class AdminFulfillmentApiController extends Controller
         $data = $this->validatedCreate($request);
         $data['supplier_user_id'] = (int) $request->user()->id;
         $data['is_active'] = false;
-        $data['base_url'] = rtrim($data['base_url'], '/');
+        $data['base_url'] = $this->normalizeAndValidateBaseUrl($data['base_url']);
+        if ($data['base_url'] === null) {
+            return back()->withErrors([
+                'base_url' => $this->consoleUrlNotApiMessage(),
+            ])->withInput();
+        }
         if (isset($data['default_provider_bundle_type']) && $data['default_provider_bundle_type'] !== null && $data['default_provider_bundle_type'] !== '') {
             $data['default_provider_bundle_type'] = trim((string) $data['default_provider_bundle_type']);
         } else {
@@ -72,7 +77,13 @@ class AdminFulfillmentApiController extends Controller
             $fulfillmentApiProfile->api_key = $data['api_key'];
         }
         $fulfillmentApiProfile->name = $data['name'];
-        $fulfillmentApiProfile->base_url = rtrim($data['base_url'], '/');
+        $baseUrl = $this->normalizeAndValidateBaseUrl($data['base_url']);
+        if ($baseUrl === null) {
+            return back()->withErrors([
+                'base_url' => $this->consoleUrlNotApiMessage(),
+            ])->withInput();
+        }
+        $fulfillmentApiProfile->base_url = $baseUrl;
         $fulfillmentApiProfile->default_provider_bundle_type = filled($data['default_provider_bundle_type'] ?? null)
             ? trim((string) $data['default_provider_bundle_type'])
             : null;
@@ -109,6 +120,29 @@ class AdminFulfillmentApiController extends Controller
     private function authorizeProfile(Request $request, FulfillmentApiProfile $profile): void
     {
         abort_unless((int) $profile->supplier_user_id === (int) $request->user()->id, 404);
+    }
+
+    /**
+     * @return string|null Normalized API host, or null if user entered the web console URL.
+     */
+    private function normalizeAndValidateBaseUrl(string $baseUrl): ?string
+    {
+        $normalized = FulfillmentApiProfile::normalizeBaseUrl($baseUrl);
+        $host = strtolower((string) parse_url($normalized, PHP_URL_HOST));
+
+        if ($host === 'console.igetghana.com' || str_starts_with($host, 'console.')) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private function consoleUrlNotApiMessage(): string
+    {
+        return __(':console is the iGet website login, not the API server. Use API base URL :api (from your iGet developer docs), then Activate your profile.', [
+            'console' => 'https://console.igetghana.com',
+            'api' => 'https://iget.onrender.com',
+        ]);
     }
 
     /**

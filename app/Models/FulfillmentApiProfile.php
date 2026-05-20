@@ -43,4 +43,25 @@ class FulfillmentApiProfile extends Model
             ->where('is_active', true)
             ->first();
     }
+
+    /**
+     * Host root only (e.g. https://iget.onrender.com). Strips accidental /api/developer/... suffixes.
+     */
+    public static function normalizeBaseUrl(string $baseUrl): string
+    {
+        $base = rtrim(trim($baseUrl), '/');
+
+        foreach ([
+            '/api/developer/orders/place',
+            '/api/developer/orders/reference',
+            '/api/developer',
+        ] as $suffix) {
+            $len = strlen($suffix);
+            if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {
+                $base = rtrim(substr($base, 0, -$len), '/');
+            }
+        }
+
+        return $base;
+    }
 }
