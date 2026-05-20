@@ -9,7 +9,12 @@
     </div>
 
     <div class="max-w-xl rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
-        <p class="mb-4 text-sm text-slate-400">{{ __('Network: :n (cannot be changed here)', ['n' => $profile->network]) }}</p>
+        <p class="mb-4 text-sm text-slate-400">
+            {{ __('Network: :n · Provider: :p (cannot be changed here)', [
+                'n' => $profile->network,
+                'p' => \App\Support\FulfillmentProviderType::labels()[$profile->provider_type] ?? $profile->provider_type,
+            ]) }}
+        </p>
 
         <form method="post" action="{{ route('admin.fulfillment-apis.update', $profile) }}" class="space-y-4">
             @csrf
@@ -24,21 +29,33 @@
             <div>
                 <label class="mb-1 block text-sm text-slate-400">{{ __('Base URL') }}</label>
                 <input type="url" name="base_url" value="{{ old('base_url', $profile->base_url) }}" required maxlength="512" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
-                <p class="mt-1 text-xs text-slate-500">{{ __('API host only — not https://console.igetghana.com. Example: :api', ['api' => config('datahome.fulfillment.default_provider_base_url', 'https://iget.onrender.com')]) }}</p>
+                <p class="mt-1 text-xs text-slate-500">
+                    @if ($profile->isGeonet())
+                        {{ __('Geonettech base, e.g. :api', ['api' => config('datahome.fulfillment.providers.geonet.default_base_url')]) }}
+                    @else
+                        {{ __('iGet API host only — not console.igetghana.com. Example: :api', ['api' => config('datahome.fulfillment.providers.iget.default_base_url')]) }}
+                    @endif
+                </p>
                 @error('base_url')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                 @enderror
             </div>
             <div>
-                <label class="mb-1 block text-sm text-slate-400">{{ __('Default provider bundle code (optional)') }}</label>
-                <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type', $profile->default_provider_bundle_type ?? '') }}" maxlength="120" placeholder="{{ __('Used when a bundle has no code') }}"
+                <label class="mb-1 block text-sm text-slate-400">
+                    {{ $profile->isGeonet() ? __('Default network_key (optional)') : __('Default bundleType (optional)') }}
+                </label>
+                <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type', $profile->default_provider_bundle_type ?? '') }}" maxlength="120"
+                    placeholder="{{ $profile->isGeonet() ? 'YELLO' : 'telecelup2u' }}"
                     class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                <p class="mt-1 text-xs text-slate-500">{{ __('Used when a bundle has no provider code.') }}</p>
                 @error('default_provider_bundle_type')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
                 @enderror
             </div>
             <div>
-                <label class="mb-1 block text-sm text-slate-400">{{ __('New API key (leave blank to keep current)') }}</label>
+                <label class="mb-1 block text-sm text-slate-400">
+                    {{ $profile->isGeonet() ? __('New Bearer token (leave blank to keep current)') : __('New API key (leave blank to keep current)') }}
+                </label>
                 <input type="password" name="api_key" value="" autocomplete="new-password" maxlength="2000" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
                 @error('api_key')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
