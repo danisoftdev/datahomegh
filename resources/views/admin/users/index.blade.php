@@ -36,6 +36,7 @@
                     <th class="px-3 py-2">{{ __('Role') }}</th>
                     <th class="px-3 py-2">{{ __('Status') }}</th>
                     <th class="px-3 py-2">{{ __('Shop') }}</th>
+                    <th class="px-3 py-2">{{ __('Wallet') }}</th>
                     <th class="px-3 py-2"></th>
                 </tr>
             </thead>
@@ -47,6 +48,16 @@
                         <td class="px-3 py-2">{{ $u->role?->slug }}</td>
                         <td class="px-3 py-2">{{ $u->status }}</td>
                         <td class="px-3 py-2">{{ $u->shop_name ?? '—' }}</td>
+                        <td class="px-3 py-2">
+                            @if ($u->wallet)
+                                <span class="font-medium text-emerald-300">{{ number_format((float) $u->wallet->balance, 2) }} GHS</span>
+                                @if ($u->wallet->is_frozen)
+                                    <span class="ml-1 text-xs text-amber-400">({{ __('frozen') }})</span>
+                                @endif
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="px-3 py-2"><a href="{{ route('admin.users.show', $u) }}" class="text-[#FFD700] hover:underline">{{ __('View') }}</a></td>
                     </tr>
                 @endforeach

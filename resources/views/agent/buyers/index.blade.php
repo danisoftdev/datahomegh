@@ -14,6 +14,7 @@
                     <th class="px-3 py-2">{{ __('Username') }}</th>
                     <th class="px-3 py-2">{{ __('Name') }}</th>
                     <th class="px-3 py-2">{{ __('Status') }}</th>
+                    <th class="px-3 py-2">{{ __('Wallet') }}</th>
                     <th class="px-3 py-2"></th>
                 </tr>
             </thead>
@@ -24,6 +25,16 @@
                         <td class="px-3 py-2">{{ $b->username }}</td>
                         <td class="px-3 py-2">{{ $b->name }}</td>
                         <td class="px-3 py-2">{{ $b->status }}</td>
+                        <td class="px-3 py-2">
+                            @if ($b->wallet)
+                                <span class="font-medium text-emerald-300">{{ number_format((float) $b->wallet->balance, 2) }} GHS</span>
+                                @if ($b->wallet->is_frozen)
+                                    <span class="ml-1 text-xs text-amber-400">({{ __('frozen') }})</span>
+                                @endif
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="px-3 py-2">
                             <a href="{{ route('agent.buyers.show', $b) }}" class="text-emerald-400 hover:underline">{{ __('View') }}</a>
                         </td>

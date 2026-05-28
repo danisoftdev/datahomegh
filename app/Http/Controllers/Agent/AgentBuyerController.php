@@ -21,7 +21,7 @@ class AgentBuyerController extends Controller
     public function index(Request $request): View
     {
         $buyers = User::query()
-            ->with('role')
+            ->with(['role', 'wallet'])
             ->where('agent_id', $request->user()->id)
             ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_BUYER))
             ->orderByDesc('id')
