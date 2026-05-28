@@ -41,7 +41,7 @@ class AdminUserController extends Controller
     public function index(Request $request): View
     {
         $query = User::query()
-            ->with('role')
+            ->with(['role', 'wallet'])
             ->whereHas('role', fn ($q) => $q->whereIn('slug', [Role::SLUG_AGENT, Role::SLUG_BUYER]));
 
         if ($request->filled('role')) {

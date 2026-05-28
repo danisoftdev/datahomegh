@@ -84,6 +84,36 @@ class AgentBuyerWalletTest extends TestCase
         ]);
     }
 
+    public function test_agent_buyers_index_shows_wallet_balances(): void
+    {
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'username' => 'buyerbal',
+            'agent_id' => $agent->id,
+            'status' => 'active',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '18.75',
+            'is_frozen' => false,
+        ]);
+
+        $this->actingAs($agent)->get(route('agent.buyers.index'))
+            ->assertOk()
+            ->assertSeeText(__('Wallet'))
+            ->assertSee('18.75')
+            ->assertSee('buyerbal');
+    }
+
     public function test_other_agent_cannot_credit_buyer(): void
     {
         $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();

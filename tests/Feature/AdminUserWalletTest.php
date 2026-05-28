@@ -98,6 +98,21 @@ class AdminUserWalletTest extends TestCase
             ->assertSeeText(__('Credit wallet'));
     }
 
+    public function test_admin_users_index_shows_wallet_balances(): void
+    {
+        $supplier = $this->supplier();
+        $buyer = $this->buyerWithWallet('42.50');
+        $agent = $this->agentWithWallet('100.00');
+
+        $this->actingAs($supplier)->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertSeeText(__('Wallet'))
+            ->assertSee('42.50')
+            ->assertSee('100.00')
+            ->assertSee($buyer->username)
+            ->assertSee($agent->username);
+    }
+
     private function supplier(): User
     {
         $role = Role::query()->where('slug', Role::SLUG_SUPPLIER)->firstOrFail();
