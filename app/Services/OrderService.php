@@ -222,22 +222,7 @@ class OrderService
         });
 
         foreach ($orders as $order) {
-            $result = $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order);
-
-            if (($result['ok'] ?? false) && $order->fresh()?->status === 'PENDING') {
-                $changedBy = (int) (User::supplierUser()?->id ?? $order->user_id);
-                try {
-                    $this->updateStatus(
-                        (int) $order->id,
-                        'PROCESSING',
-                        $changedBy,
-                        __('Sent to provider API automatically.'),
-                        true,
-                    );
-                } catch (InvalidArgumentException) {
-                    // Order may already have moved; provider fields were still saved.
-                }
-            }
+            $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order);
         }
 
         return $orders;
