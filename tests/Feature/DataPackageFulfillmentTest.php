@@ -371,7 +371,7 @@ class DataPackageFulfillmentTest extends TestCase
         ];
     }
 
-    public function test_mtn_data_dispatches_to_encarta_ishare(): void
+    public function test_mtn_data_dispatches_to_encarta_purchase_with_yello(): void
     {
         $supplier = $this->supplier();
         $this->encartaProfile($supplier);
@@ -388,7 +388,7 @@ class DataPackageFulfillmentTest extends TestCase
         ]);
 
         Http::fake([
-            'https://provider.test/api/ishare' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+            'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
         ]);
 
         $buyer = $this->buyerWithWallet('100.00');
@@ -403,10 +403,11 @@ class DataPackageFulfillmentTest extends TestCase
         $order = Order::query()->latest('id')->firstOrFail();
 
         Http::assertSent(function ($request) use ($order) {
-            return $request->url() === 'https://provider.test/api/ishare'
+            return $request->url() === 'https://provider.test/api/purchase'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
                 && $request['recipient'] === '0244123456'
                 && $request['volume_mb'] === 2048
+                && $request['networkKey'] === 'YELLO'
                 && $request['reference'] === (string) $order->id;
         });
 
@@ -430,7 +431,7 @@ class DataPackageFulfillmentTest extends TestCase
         ]);
 
         Http::fake([
-            'https://provider.test/api/ishare' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+            'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
         ]);
 
         $buyer = $this->buyerWithWallet('100.00');

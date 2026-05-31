@@ -18,7 +18,7 @@ final class EncartaFulfillmentClient
     public function place(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile, string $network): array
     {
         $base = FulfillmentApiProfile::normalizeEncartaBaseUrl((string) $profile->base_url);
-        $placePath = (string) config('datahome.fulfillment.providers.encarta.place_path', '/ishare');
+        $placePath = (string) config('datahome.fulfillment.providers.encarta.place_path', '/purchase');
         $url = $base.$placePath;
         $ref = (string) $order->id;
         $volumeMb = $this->volumeMbForBundle($bundle);
@@ -29,8 +29,8 @@ final class EncartaFulfillmentClient
             'reference' => $ref,
         ];
 
-        if ($placePath === '/purchase' || str_ends_with($placePath, '/purchase')) {
-            $payload['network'] = strtoupper($network);
+        if ($this->usesPurchaseEndpoint($placePath)) {
+            $payload['networkKey'] = strtoupper(trim($network));
         }
 
         try {
@@ -175,6 +175,13 @@ final class EncartaFulfillmentClient
         }
 
         return 1024;
+    }
+
+    private function usesPurchaseEndpoint(string $placePath): bool
+    {
+        return $placePath === '/purchase'
+            || str_ends_with($placePath, '/purchase')
+            || str_ends_with($placePath, '/bulk-purchase');
     }
 
     private function httpErrorMessage(int $code, string $url, string $body): string
