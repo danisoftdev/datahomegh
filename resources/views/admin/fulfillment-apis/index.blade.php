@@ -98,31 +98,39 @@
         </form>
     </div>
 
+    @php
+        $fulfillmentProviderDefaults = [
+            'iget' => [
+                'network' => 'Telecel',
+                'baseUrl' => config('datahome.fulfillment.providers.iget.default_base_url'),
+                'baseHint' => __('iGet API host only (not console.igetghana.com). Calls: {base}/api/developer/orders/place'),
+                'autoKeyNote' => __('Telecel bundleType :type is applied automatically for all Telecel data orders.', [
+                    'type' => \App\Support\IgetTelecelBundleType::resolve(),
+                ]),
+                'keyLabel' => __('iGet API key (X-API-Key)'),
+            ],
+            'geonet' => [
+                'network' => 'MTN',
+                'baseUrl' => config('datahome.fulfillment.providers.geonet.default_base_url'),
+                'baseHint' => __('Geonettech API base. Calls: {base}/v1/place-order'),
+                'autoKeyNote' => __('MTN uses Geonettech network_key :key automatically.', [
+                    'key' => \App\Support\GeonetMtnNetworkKey::resolve(),
+                ]),
+                'keyLabel' => __('Geonettech Bearer token'),
+            ],
+            'encarta' => [
+                'network' => 'MTN',
+                'baseUrl' => config('datahome.fulfillment.providers.encarta.default_base_url'),
+                'baseHint' => __('Encarta API base. MTN data uses POST /purchase with networkKey YELLO.'),
+                'autoKeyNote' => __('MTN Encarta sends POST /purchase automatically (networkKey YELLO, recipient, volume_mb, reference).'),
+                'keyLabel' => __('Encarta X-API-Key'),
+            ],
+        ];
+    @endphp
+
     <script>
         (function () {
-            const defaults = {
-                iget: {
-                    network: 'Telecel',
-                    baseUrl: @json(config('datahome.fulfillment.providers.iget.default_base_url')),
-                    baseHint: @json(__('iGet API host only (not console.igetghana.com). Calls: {base}/api/developer/orders/place')),
-                    autoKeyNote: @json(__('Telecel bundleType :type is applied automatically for all Telecel data orders.', ['type' => \App\Support\IgetTelecelBundleType::resolve()])),
-                    keyLabel: @json(__('iGet API key (X-API-Key)')),
-                },
-                geonet: {
-                    network: 'MTN',
-                    baseUrl: @json(config('datahome.fulfillment.providers.geonet.default_base_url')),
-                    baseHint: @json(__('Geonettech API base. Calls: {base}/v1/place-order')),
-                    autoKeyNote: @json(__('MTN uses Geonettech network_key :key automatically.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()])),
-                    keyLabel: @json(__('Geonettech Bearer token')),
-                },
-                encarta: {
-                    network: 'MTN',
-                    baseUrl: @json(config('datahome.fulfillment.providers.encarta.default_base_url')),
-                    baseHint: @json(__('Encarta API base. MTN data: {base}/purchase with networkKey YELLO')),
-                    autoKeyNote: @json(__('MTN Encarta: POST /purchase with networkKey :key — recipient, volume_mb, reference.', ['key' => \App\Support\EncartaMtnNetwork::resolve()])),
-                    keyLabel: @json(__('Encarta X-API-Key')),
-                },
-            };
+            const defaults = @json($fulfillmentProviderDefaults);
 
             const providerEl = document.getElementById('provider_type');
             const networkEl = document.getElementById('network');
