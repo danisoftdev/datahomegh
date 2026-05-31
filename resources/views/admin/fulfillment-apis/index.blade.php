@@ -119,7 +119,7 @@
                     network: 'MTN',
                     baseUrl: @json(config('datahome.fulfillment.providers.encarta.default_base_url')),
                     baseHint: @json(__('Encarta API base. Calls: {base}/ishare (MTN data)')),
-                    autoKeyNote: @json(__('MTN Encarta: recipient + volume (GB) + order reference sent to /ishare automatically.')),
+                    autoKeyNote: @json(__('MTN Encarta: recipient + volume_mb (from bundle size) + order reference sent to /ishare automatically.')),
                     keyLabel: @json(__('Encarta X-API-Key')),
                 },
             };

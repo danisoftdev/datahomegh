@@ -22,7 +22,7 @@
                         @if ($order->network === 'MTN')
                             @php($mtnApi = $order->fulfillmentApiProfile ?? \App\Models\FulfillmentApiProfile::activeForNetwork('MTN'))
                             @if ($mtnApi?->isEncarta())
-                                <span class="block text-xs text-slate-500">{{ __('Encarta MTN iShare') }} · {{ __('volume from bundle size') }}</span>
+                                <span class="block text-xs text-slate-500">{{ __('Encarta MTN iShare') }} · {{ __('volume_mb from bundle size (GB × 1024)') }}</span>
                             @elseif ($mtnApi?->isGeonet())
                                 <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
                             @endif

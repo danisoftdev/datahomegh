@@ -48,7 +48,7 @@
                 </p>
             @elseif ($profile->isEncarta())
                 <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
-                    {{ __('MTN Encarta uses POST :path with recipient, volume (GB from bundle size), and order reference. Status via GET :status.', [
+                    {{ __('MTN Encarta uses POST :path with recipient, volume_mb (MB from bundle size), and order reference. Status via GET :status.', [
                         'path' => config('datahome.fulfillment.providers.encarta.place_path', '/ishare'),
                         'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
                     ]) }}
