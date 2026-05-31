@@ -33,7 +33,7 @@ final class DataPackageFulfillmentService
         if (! $this->shouldAutoDispatchToProvider($order)) {
             return [
                 'ok' => false,
-                'message' => __('This order is handled by the agent shop and is not sent to the external API automatically.'),
+                'message' => __('This order is not eligible for automatic provider dispatch.'),
                 'skipped' => true,
             ];
         }
@@ -124,7 +124,7 @@ final class DataPackageFulfillmentService
     }
 
     /**
-     * Auto API: agent self-checkout and platform buyers only — not buyers linked to an agent shop.
+     * Auto API: all agent and buyer data orders (including agent-shop buyers).
      */
     private function shouldAutoDispatchToProvider(Order $order): bool
     {
@@ -133,15 +133,7 @@ final class DataPackageFulfillmentService
             return false;
         }
 
-        if ($user->role?->slug === Role::SLUG_AGENT) {
-            return true;
-        }
-
-        if ($user->role?->slug === Role::SLUG_BUYER) {
-            return $user->agent_id === null;
-        }
-
-        return false;
+        return in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Notification;
+use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\BroadcastAnnouncementNotification;
@@ -223,6 +224,22 @@ class NotificationService
             ->cursor()
             ->each(function (User $supplier) use ($title, $message): void {
                 $this->notify($supplier->id, $title, $message, 'agent_registered');
+            });
+    }
+
+    public function notifySuppliersNewOrder(Order $order): void
+    {
+        $order->loadMissing(['user', 'bundlePackage']);
+        $buyer = $order->user?->username ?? '#'.$order->user_id;
+        $bundle = $order->bundlePackage?->name ?? __('Bundle');
+        $title = 'New order #'.$order->id;
+        $message = "{$buyer} · {$order->network} · {$order->phone_number} · {$bundle}";
+
+        User::query()
+            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_SUPPLIER))
+            ->cursor()
+            ->each(function (User $supplier) use ($title, $message): void {
+                $this->notify($supplier->id, $title, $message, 'order_received');
             });
     }
 }

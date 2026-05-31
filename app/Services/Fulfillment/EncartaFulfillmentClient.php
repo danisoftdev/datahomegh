@@ -5,6 +5,7 @@ namespace App\Services\Fulfillment;
 use App\Models\BundlePackage;
 use App\Models\FulfillmentApiProfile;
 use App\Models\Order;
+use App\Support\GhanaPhoneNumber;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -23,7 +24,7 @@ final class EncartaFulfillmentClient
         $volumeGb = $this->capacityGbForBundle($bundle);
 
         $payload = [
-            'recipient' => (string) $order->phone_number,
+            'recipient' => GhanaPhoneNumber::forApi((string) $order->phone_number),
             'volume' => $volumeGb,
             'reference' => $ref,
         ];

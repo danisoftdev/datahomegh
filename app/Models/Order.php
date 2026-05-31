@@ -69,15 +69,7 @@ class Order extends Model
      */
     public function scopeVisibleToSupplier(Builder $query): Builder
     {
-        return $query->whereHas('user', function (Builder $userQuery): void {
-            $userQuery->where(function (Builder $w): void {
-                $w->whereHas('role', fn (Builder $r) => $r->where('slug', Role::SLUG_AGENT))
-                    ->orWhere(function (Builder $inner): void {
-                        $inner->whereHas('role', fn (Builder $r) => $r->where('slug', Role::SLUG_BUYER))
-                            ->whereNull('users.agent_id');
-                    });
-            });
-        });
+        return $query;
     }
 
     public function getStatusColorAttribute(): string

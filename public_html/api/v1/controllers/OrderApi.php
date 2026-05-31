@@ -318,7 +318,7 @@ final class OrderApi
             'SELECT 1 FROM users u
              INNER JOIN roles r ON r.id = u.role_id
              WHERE u.id = ? AND u.deleted_at IS NULL
-             AND (r.slug = ? OR (r.slug = ? AND u.agent_id IS NULL))
+             AND r.slug IN (?, ?)
              LIMIT 1'
         );
         $st->execute([$orderUserId, ROLE_AGENT, ROLE_BUYER]);

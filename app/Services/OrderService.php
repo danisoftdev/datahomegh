@@ -211,6 +211,10 @@ class OrderService
                     'order_received'
                 );
 
+                if ($order->fresh() && Order::query()->visibleToSupplier()->whereKey($order->id)->exists()) {
+                    $this->notificationService->notifySuppliersNewOrder($order);
+                }
+
                 $orders->push($order->fresh(['bundlePackage', 'orderStatusHistories']));
             }
 
@@ -218,7 +222,22 @@ class OrderService
         });
 
         foreach ($orders as $order) {
-            $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order);
+            $result = $this->dataPackageFulfillmentService->dispatchAfterOrderPlaced($order);
+
+            if (($result['ok'] ?? false) && $order->fresh()?->status === 'PENDING') {
+                $changedBy = (int) (User::supplierUser()?->id ?? $order->user_id);
+                try {
+                    $this->updateStatus(
+                        (int) $order->id,
+                        'PROCESSING',
+                        $changedBy,
+                        __('Sent to provider API automatically.'),
+                        true,
+                    );
+                } catch (InvalidArgumentException) {
+                    // Order may already have moved; provider fields were still saved.
+                }
+            }
         }
 
         return $orders;
