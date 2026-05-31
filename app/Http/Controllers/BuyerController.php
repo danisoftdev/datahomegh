@@ -29,7 +29,7 @@ class BuyerController extends Controller
             ->limit(5)
             ->get();
 
-        $bundles = BundleCatalog::forBuyer($user);
+        $bundles = BundleCatalog::forUser($user);
 
         $bundlesJson = $bundles->map(function ($b) use ($user): array {
             return [

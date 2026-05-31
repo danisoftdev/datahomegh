@@ -184,8 +184,6 @@ class ApiOrderController extends Controller
 
     private function bundleCatalogFor(User $user): EloquentCollection
     {
-        return $user->isAgent()
-            ? BundleCatalog::forAgent($user)
-            : BundleCatalog::forBuyer($user);
+        return BundleCatalog::forUser($user);
     }
 }

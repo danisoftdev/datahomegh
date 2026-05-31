@@ -144,16 +144,30 @@
             @if ($user->id !== auth()->id())
                 <div class="mt-6 grid gap-4 border-t border-white/10 pt-6 sm:grid-cols-2">
                     <div>
-                        <h3 class="mb-2 text-sm font-medium text-white">{{ __('Change role') }}</h3>
-                        <form method="post" action="{{ route('admin.users.role', $user) }}" class="flex gap-2">
+                        <h3 class="mb-2 text-sm font-medium text-white">{{ __('Promote / change role') }}</h3>
+                        <p class="mb-2 text-xs text-slate-500">{{ __('Only you can assign custom roles. They never appear on registration. Agent shops stay intact when promoted.') }}</p>
+                        <form method="post" action="{{ route('admin.users.role', $user) }}" class="space-y-3">
                             @csrf
                             @method('PATCH')
-                            <select name="role_id" class="flex-1 rounded-lg border border-white/10 bg-[#1A1A2E] px-2 py-1.5 text-sm text-white">
-                                @foreach (\App\Models\Role::query()->where('slug', '!=', \App\Models\Role::SLUG_SUPPLIER)->get() as $r)
-                                    <option value="{{ $r->id }}" @selected($user->role_id === $r->id)>{{ $r->name }}</option>
+                            <select name="role_id" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-2 py-1.5 text-sm text-white">
+                                @foreach (\App\Models\Role::query()->where('slug', '!=', \App\Models\Role::SLUG_SUPPLIER)->orderBy('name')->get() as $r)
+                                    <option value="{{ $r->id }}" @selected($user->role_id === $r->id)>
+                                        {{ $r->name }}
+                                        @if ($r->requires_promotion_fee && bccomp($r->promotionFeeAmount(), '0', 2) > 0)
+                                            ({{ __('fee') }} {{ number_format((float) $r->promotion_fee, 2) }} GHS)
+                                        @endif
+                                    </option>
                                 @endforeach
                             </select>
-                            <button class="rounded-lg bg-[#FFD700] px-3 py-1.5 text-xs font-semibold text-[#1A1A2E]">{{ __('Save') }}</button>
+                            @error('role_id')
+                                <p class="text-sm text-red-400">{{ $message }}</p>
+                            @enderror
+                            <label class="flex items-center gap-2 text-xs text-slate-400">
+                                <input type="hidden" name="waive_promotion_fee" value="0" />
+                                <input type="checkbox" name="waive_promotion_fee" value="1" class="size-4 rounded border-white/20" />
+                                {{ __('Waive promotion fee (if the role charges one)') }}
+                            </label>
+                            <button class="rounded-lg bg-[#FFD700] px-3 py-1.5 text-xs font-semibold text-[#1A1A2E]">{{ __('Update role') }}</button>
                         </form>
                     </div>
                     <div>

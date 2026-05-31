@@ -45,6 +45,9 @@ class AdminBundleRolePriceTest extends TestCase
             'is_available' => true,
         ]);
 
+        $buyerRoleId = (int) Role::query()->where('slug', Role::SLUG_BUYER)->value('id');
+        $agentRoleId = (int) Role::query()->where('slug', Role::SLUG_AGENT)->value('id');
+
         $this->actingAs($supplier)->put(route('admin.bundles.update', $bundle), [
             'network' => 'MTN',
             'package_kind' => 'data',
@@ -53,12 +56,11 @@ class AdminBundleRolePriceTest extends TestCase
             'internal_cost' => '5.00',
             'stock_count' => 10,
             'is_available' => '1',
-            'buyer_list_price' => '12.50',
-            'agent_list_price' => '7.25',
+            'role_list_prices' => [
+                (string) $buyerRoleId => '12.50',
+                (string) $agentRoleId => '7.25',
+            ],
         ])->assertRedirect(route('admin.bundles.index'));
-
-        $buyerRoleId = (int) Role::query()->where('slug', Role::SLUG_BUYER)->value('id');
-        $agentRoleId = (int) Role::query()->where('slug', Role::SLUG_AGENT)->value('id');
 
         $this->assertDatabaseHas('role_prices', [
             'bundle_package_id' => $bundle->id,
@@ -147,8 +149,9 @@ class AdminBundleRolePriceTest extends TestCase
             'internal_cost' => '4.00',
             'stock_count' => 10,
             'is_available' => '1',
-            'buyer_list_price' => '',
-            'agent_list_price' => '',
+            'role_list_prices' => [
+                (string) $buyerRoleId => '',
+            ],
         ])->assertRedirect(route('admin.bundles.index'));
 
         $this->assertDatabaseMissing('role_prices', [

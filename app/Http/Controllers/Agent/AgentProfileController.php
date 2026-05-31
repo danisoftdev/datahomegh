@@ -23,7 +23,7 @@ class AgentProfileController extends Controller
     public function edit(Request $request): View
     {
         $user = $request->user();
-        abort_unless($user->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($user->canAccessAgentArea(), 403);
 
         return view('agent.profile.edit', compact('user'));
     }
@@ -32,7 +32,7 @@ class AgentProfileController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        abort_unless($user->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($user->canAccessAgentArea(), 403);
 
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique(User::class, 'username')->ignore($user->id)],
@@ -86,7 +86,7 @@ class AgentProfileController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($user->canAccessAgentArea(), 403);
 
         $request->validate([
             'current_password' => ['required', 'current_password'],

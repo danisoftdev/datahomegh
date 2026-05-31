@@ -159,7 +159,7 @@ class AgentOrderController extends Controller
 
     private function assertAgentOrder(Request $request, Order $order): void
     {
-        abort_unless($request->user()->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($request->user()->canAccessAgentArea(), 403);
         abort_unless((int) $order->agent_id === (int) $request->user()->id, 403);
     }
 }

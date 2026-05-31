@@ -25,10 +25,10 @@ class AgentCheckoutController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        abort_unless($user->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($user->canAccessAgentArea(), 403);
 
         $networks = ['MTN', 'Telecel', 'AirtelTigo', 'MTN_AFA'];
-        $bundles = BundleCatalog::forAgent($user);
+        $bundles = BundleCatalog::forUser($user);
 
         $bundlesJson = $bundles->map(function ($b) use ($user): array {
             return [
@@ -63,9 +63,9 @@ class AgentCheckoutController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        abort_unless($user->role?->slug === Role::SLUG_AGENT, 403);
+        abort_unless($user->canAccessAgentArea(), 403);
 
-        $catalog = BundleCatalog::forAgent($user);
+        $catalog = BundleCatalog::forUser($user);
         $result = OrderCartItemsValidator::validate($request, $user, $catalog);
 
         if (! $result['ok']) {

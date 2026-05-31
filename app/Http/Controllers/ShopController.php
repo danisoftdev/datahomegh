@@ -15,7 +15,7 @@ class ShopController extends Controller
             ->where('shop_slug', $agentSlug)
             ->where('status', 'active')
             ->whereNotNull('shop_slug')
-            ->whereHas('role', fn ($q) => $q->where('slug', Role::SLUG_AGENT))
+            ->whereHas('role', fn ($q) => $q->where('slug', '!=', Role::SLUG_SUPPLIER))
             ->with([
                 'resalePlans' => function ($q): void {
                     $q->where('resale_plans.is_active', true)

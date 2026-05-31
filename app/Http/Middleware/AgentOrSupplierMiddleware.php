@@ -17,13 +17,11 @@ class AgentOrSupplierMiddleware
 
         $request->user()->loadMissing('role');
 
-        $slug = $request->user()->role?->slug;
-
-        if (! in_array($slug, [Role::SLUG_AGENT, Role::SLUG_SUPPLIER], true)) {
-            return $this->denyForbidden($request);
+        if ($request->user()->isSupplier() || $request->user()->canAccessAgentArea()) {
+            return $next($request);
         }
 
-        return $next($request);
+        return $this->denyForbidden($request);
     }
 
     private function denyGuest(Request $request): Response

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Role;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,11 +19,21 @@ class RoleMiddleware
 
         $slug = $request->user()->role?->slug;
 
-        if ($slug === null || ! in_array($slug, $roles, true)) {
-            return $this->denyForbidden($request);
+        foreach ($roles as $roleSlug) {
+            if ($roleSlug === Role::SLUG_AGENT && $request->user()->canAccessAgentArea()) {
+                return $next($request);
+            }
+
+            if ($roleSlug === Role::SLUG_BUYER && $request->user()->canAccessBuyerArea()) {
+                return $next($request);
+            }
+
+            if ($slug === $roleSlug) {
+                return $next($request);
+            }
         }
 
-        return $next($request);
+        return $this->denyForbidden($request);
     }
 
     private function denyGuest(Request $request): Response

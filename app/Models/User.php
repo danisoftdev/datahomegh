@@ -158,6 +158,52 @@ class User extends Authenticatable
         return $this->role?->slug === Role::SLUG_BUYER;
     }
 
+    public function hasAgentShop(): bool
+    {
+        return filled($this->shop_slug);
+    }
+
+    /**
+     * Agent dashboard, platform checkout, and shop tools — includes promoted agents who keep their shop.
+     */
+    public function canAccessAgentArea(): bool
+    {
+        if ($this->isSupplier()) {
+            return false;
+        }
+
+        if ($this->isAgent() || $this->hasAgentShop()) {
+            return true;
+        }
+
+        $this->loadMissing('role');
+
+        return $this->role?->usesAgentPersona() ?? false;
+    }
+
+    /**
+     * Buyer dashboard and checkout — not when the user still owns an agent shop.
+     */
+    public function canAccessBuyerArea(): bool
+    {
+        if ($this->isSupplier() || $this->hasAgentShop()) {
+            return false;
+        }
+
+        if ($this->isBuyer()) {
+            return true;
+        }
+
+        $this->loadMissing('role');
+
+        return $this->role?->usesBuyerPersona() ?? false;
+    }
+
+    public function usesAgentPlatformCatalog(): bool
+    {
+        return $this->canAccessAgentArea();
+    }
+
     /**
      * Buyers registered under an agent must not use supplier Paystack top-up;
      * they fund via the agent (MoMo) and the agent credits this wallet.

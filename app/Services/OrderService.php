@@ -169,7 +169,7 @@ class OrderService
 
                 $order = Order::query()->create([
                     'user_id' => $userId,
-                    'agent_id' => $user->isAgent() ? $user->id : $user->agent_id,
+                    'agent_id' => ($user->isAgent() || $user->hasAgentShop()) ? $user->id : $user->agent_id,
                     'network' => $row['network'],
                     'phone_number' => $row['phone_number'],
                     'afa_registration' => $row['afa_registration'],
