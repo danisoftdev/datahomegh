@@ -56,6 +56,11 @@ class FulfillmentApiProfile extends Model
         return $this->provider_type === FulfillmentProviderType::GEONET;
     }
 
+    public function isEncarta(): bool
+    {
+        return $this->provider_type === FulfillmentProviderType::ENCARTA;
+    }
+
     public static function defaultBaseUrl(string $providerType): string
     {
         return (string) config('datahome.fulfillment.providers.'.$providerType.'.default_base_url', '');
@@ -94,6 +99,32 @@ class FulfillmentApiProfile extends Model
             '/v1/order',
             '/v1/wallet/balance',
             '/v1',
+        ] as $suffix) {
+            $len = strlen($suffix);
+            if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {
+                $base = rtrim(substr($base, 0, -$len), '/');
+            }
+        }
+
+        return $base;
+    }
+
+    /**
+     * Encarta base (https://encartastores.com/api). Strips accidental endpoint suffixes.
+     */
+    public static function normalizeEncartaBaseUrl(string $baseUrl): string
+    {
+        $base = rtrim(trim($baseUrl), '/');
+
+        foreach ([
+            '/ishare-status',
+            '/afa-status-bulk',
+            '/bulk-purchase',
+            '/result-checker',
+            '/ishare',
+            '/purchase',
+            '/afa-status',
+            '/balance',
         ] as $suffix) {
             $len = strlen($suffix);
             if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {

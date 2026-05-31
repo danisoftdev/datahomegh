@@ -87,6 +87,37 @@ class DataPackageFulfillmentTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function encartaProfile(User $supplier, array $overrides = []): FulfillmentApiProfile
+    {
+        return FulfillmentApiProfile::query()->create(array_merge([
+            'supplier_user_id' => $supplier->id,
+            'network' => 'MTN',
+            'provider_type' => FulfillmentProviderType::ENCARTA,
+            'name' => 'Encarta MTN',
+            'base_url' => 'https://provider.test/api',
+            'api_key' => 'encarta-key',
+            'is_active' => true,
+        ], $overrides));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function encartaPlaceSuccessResponse(): array
+    {
+        return [
+            'success' => true,
+            'message' => 'Order accepted',
+            'data' => [
+                'reference' => 'ENC-123',
+                'status' => 'pending',
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function geonetPlaceSuccessResponse(): array
@@ -303,6 +334,126 @@ class DataPackageFulfillmentTest extends TestCase
         ])->assertSessionHasErrors('network');
 
         $this->assertSame(0, FulfillmentApiProfile::query()->count());
+    }
+
+    public function test_admin_cannot_pair_encarta_with_telecel(): void
+    {
+        $supplier = $this->supplier();
+
+        $this->actingAs($supplier)->post(route('admin.fulfillment-apis.store'), [
+            'provider_type' => FulfillmentProviderType::ENCARTA,
+            'network' => 'Telecel',
+            'name' => 'Wrong pairing',
+            'base_url' => 'https://encartastores.com/api',
+            'api_key' => 'encarta-key',
+        ])->assertSessionHasErrors('network');
+
+        $this->assertSame(0, FulfillmentApiProfile::query()->count());
+    }
+
+    #[DataProvider('normalizeEncartaBaseUrlProvider')]
+    public function test_normalize_encarta_base_url_strips_endpoint_suffixes(string $input, string $expected): void
+    {
+        $this->assertSame($expected, FulfillmentApiProfile::normalizeEncartaBaseUrl($input));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function normalizeEncartaBaseUrlProvider(): array
+    {
+        return [
+            'api root' => ['https://encartastores.com/api', 'https://encartastores.com/api'],
+            'ishare path' => ['https://encartastores.com/api/ishare', 'https://encartastores.com/api'],
+            'purchase path' => ['https://encartastores.com/api/purchase', 'https://encartastores.com/api'],
+        ];
+    }
+
+    public function test_mtn_data_dispatches_to_encarta_ishare(): void
+    {
+        $supplier = $this->supplier();
+        $this->encartaProfile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 2GB',
+            'size_label' => '2GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/ishare' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ])->assertRedirect(route('buyer.orders.index'));
+
+        $order = Order::query()->latest('id')->firstOrFail();
+
+        Http::assertSent(function ($request) use ($order) {
+            return $request->url() === 'https://provider.test/api/ishare'
+                && $request->hasHeader('X-API-Key', 'encarta-key')
+                && $request['phone'] === '0244123456'
+                && $request['volume'] === 2
+                && $request['reference'] === (string) $order->id;
+        });
+
+        $this->assertSame('ENC-123', $order->provider_order_reference);
+    }
+
+    public function test_admin_can_refresh_encarta_provider_status(): void
+    {
+        $supplier = $this->supplier();
+        $this->encartaProfile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 1GB',
+            'size_label' => '1GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/ishare' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        $order = Order::query()->latest('id')->firstOrFail();
+        $this->assertSame('ENC-123', $order->provider_order_reference);
+
+        Http::fake([
+            'https://provider.test/api/ishare-status?reference=ENC-123' => Http::response([
+                'success' => true,
+                'data' => ['status' => 'completed'],
+            ], 200),
+        ]);
+
+        $this->actingAs($supplier)->post(route('admin.orders.refresh-provider-status', $order))
+            ->assertRedirect();
+
+        $this->assertSame('completed', (string) $order->fresh()->provider_status);
     }
 
     public function test_mtn_data_dispatches_to_geonet_and_stores_order_id_reference(): void

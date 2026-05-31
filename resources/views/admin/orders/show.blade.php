@@ -20,7 +20,12 @@
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}
                     @if ($order->bundlePackage && ! $order->bundlePackage->isMtnAfaRegistration())
                         @if ($order->network === 'MTN')
-                            <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
+                            @php($mtnApi = $order->fulfillmentApiProfile ?? \App\Models\FulfillmentApiProfile::activeForNetwork('MTN'))
+                            @if ($mtnApi?->isEncarta())
+                                <span class="block text-xs text-slate-500">{{ __('Encarta MTN iShare') }} · {{ __('volume from bundle size') }}</span>
+                            @elseif ($mtnApi?->isGeonet())
+                                <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
+                            @endif
                         @elseif ($order->network === 'Telecel')
                             <span class="block text-xs text-slate-500">{{ __('iGet') }}: {{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span>
                         @elseif ($order->bundlePackage->provider_bundle_type)

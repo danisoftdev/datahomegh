@@ -5,10 +5,10 @@
 
 @section('content')
     <p class="mb-6 max-w-2xl text-sm text-slate-400">
-        {{ __('Configure one active API per network. MTN uses Geonettech; Telecel uses iGet. Orders from agents (their own purchases) and platform buyers are sent automatically. Agent shop buyers stay with the agent. MTN AFA is never sent to an API.') }}
+        {{ __('Configure one active API per network. MTN: Geonettech or Encarta Stores. Telecel: iGet. Orders from agents (their own purchases) and platform buyers are sent automatically. Agent shop buyers stay with the agent. MTN AFA is never sent to an API.') }}
     </p>
 
-    <div class="mb-6 grid max-w-2xl gap-4 sm:grid-cols-2">
+    <div class="mb-6 grid max-w-4xl gap-4 lg:grid-cols-3">
         <p class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
             <strong class="text-amber-200">{{ __('Telecel — iGet') }}</strong><br>
             {{ __('Dashboard: :console. API base: :api. Auth: X-API-Key. Telecel bundleType is automatic (:type).', [
@@ -19,9 +19,17 @@
         </p>
         <p class="rounded-lg border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm text-sky-100">
             <strong class="text-sky-200">{{ __('MTN — Geonettech') }}</strong><br>
-            {{ __('Base: :api. Auth: Bearer token from dashboard → API Integration. MTN network_key is set automatically (:key).', [
+            {{ __('Base: :api. Auth: Bearer token. network_key automatic (:key).', [
                 'api' => config('datahome.fulfillment.providers.geonet.default_base_url'),
                 'key' => \App\Support\GeonetMtnNetworkKey::resolve(),
+            ]) }}
+        </p>
+        <p class="rounded-lg border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-sm text-violet-100">
+            <strong class="text-violet-200">{{ __('MTN — Encarta Stores') }}</strong><br>
+            {{ __('Base: :api. Auth: X-API-Key from API Management. POST :path · GET :status.', [
+                'api' => config('datahome.fulfillment.providers.encarta.default_base_url'),
+                'path' => config('datahome.fulfillment.providers.encarta.place_path', '/ishare'),
+                'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
             ]) }}
         </p>
     </div>
@@ -104,8 +112,15 @@
                     network: 'MTN',
                     baseUrl: @json(config('datahome.fulfillment.providers.geonet.default_base_url')),
                     baseHint: @json(__('Geonettech API base. Calls: {base}/v1/place-order')),
-                    autoKeyNote: @json(__('MTN uses Geonettech network_key :key automatically — no code field needed.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()])),
+                    autoKeyNote: @json(__('MTN uses Geonettech network_key :key automatically.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()])),
                     keyLabel: @json(__('Geonettech Bearer token')),
+                },
+                encarta: {
+                    network: 'MTN',
+                    baseUrl: @json(config('datahome.fulfillment.providers.encarta.default_base_url')),
+                    baseHint: @json(__('Encarta API base. Calls: {base}/ishare (MTN data)')),
+                    autoKeyNote: @json(__('MTN Encarta: phone + volume (GB) + order reference sent to /ishare automatically.')),
+                    keyLabel: @json(__('Encarta X-API-Key')),
                 },
             };
 
@@ -160,6 +175,8 @@
                         <p class="mt-1 font-mono text-xs text-slate-400">{{ $profile->base_url }}</p>
                         @if ($profile->isGeonet())
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN API key:') }} <span class="font-mono text-slate-300">{{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span></p>
+                        @elseif ($profile->isEncarta())
+                            <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/ishare') }}</span></p>
                         @elseif ($profile->isIget())
                             <p class="mt-1 text-xs text-slate-500">{{ __('Telecel bundleType:') }} <span class="font-mono text-slate-300">{{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span></p>
                         @endif
