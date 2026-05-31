@@ -181,7 +181,7 @@ class DataPackageFulfillmentTest extends TestCase
         $this->assertSame((string) $order->id, $order->provider_order_reference);
     }
 
-    public function test_agent_linked_buyer_order_is_not_sent_to_external_api(): void
+    public function test_agent_linked_buyer_order_is_sent_to_external_api(): void
     {
         $supplier = $this->supplier();
         $this->geonetProfile($supplier);
@@ -217,7 +217,9 @@ class DataPackageFulfillmentTest extends TestCase
             'is_available' => true,
         ]);
 
-        Http::fake();
+        Http::fake([
+            'https://provider.test/v1/place-order' => Http::response($this->geonetPlaceSuccessResponse(), 200),
+        ]);
 
         $this->actingAs($buyer)->post(route('buyer.orders.store'), [
             'network' => 'MTN',
@@ -226,12 +228,12 @@ class DataPackageFulfillmentTest extends TestCase
             'confirm' => true,
         ])->assertRedirect(route('buyer.orders.index'));
 
-        Http::assertNothingSent();
+        Http::assertSent(fn ($request) => $request->url() === 'https://provider.test/v1/place-order');
 
         $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
         $this->assertSame((int) $agent->id, (int) $order->agent_id);
-        $this->assertNull($order->provider_order_reference);
-        $this->assertNull($order->provider_dispatch_error);
+        $this->assertSame((string) $order->id, $order->provider_order_reference);
+        $this->assertSame('PROCESSING', $order->status);
     }
 
     #[DataProvider('normalizeBaseUrlProvider')]
@@ -403,7 +405,7 @@ class DataPackageFulfillmentTest extends TestCase
         Http::assertSent(function ($request) use ($order) {
             return $request->url() === 'https://provider.test/api/ishare'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
-                && $request['recipient'] === '0244123456'
+                && $request['recipient'] === '233244123456'
                 && $request['volume'] === 2
                 && $request['reference'] === (string) $order->id;
         });

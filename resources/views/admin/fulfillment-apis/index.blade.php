@@ -5,7 +5,7 @@
 
 @section('content')
     <p class="mb-6 max-w-2xl text-sm text-slate-400">
-        {{ __('Configure one active API per network. MTN: Geonettech or Encarta Stores. Telecel: iGet. Orders from agents (their own purchases) and platform buyers are sent automatically. Agent shop buyers stay with the agent. MTN AFA is never sent to an API.') }}
+        {{ __('Configure one active API per network. MTN: Geonettech or Encarta Stores. Telecel: iGet. All buyer and agent orders are sent to the API automatically and appear in Admin → Orders. MTN AFA is never sent to an API.') }}
     </p>
 
     <div class="mb-6 grid max-w-4xl gap-4 lg:grid-cols-3">

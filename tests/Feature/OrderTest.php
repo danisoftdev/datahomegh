@@ -629,7 +629,7 @@ class OrderTest extends TestCase
         ])->assertSessionHasErrors('bundle_package_id');
     }
 
-    public function test_supplier_cannot_manage_order_from_buyer_linked_to_agent(): void
+    public function test_supplier_can_manage_order_from_buyer_linked_to_agent(): void
     {
         $supplier = $this->supplierUser();
         $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
@@ -663,10 +663,11 @@ class OrderTest extends TestCase
 
         $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
 
-        $this->actingAs($supplier)->get(route('admin.orders.show', $order))->assertNotFound();
+        $this->actingAs($supplier)->get(route('admin.orders.show', $order))->assertOk();
         $this->actingAs($supplier)->patch(route('admin.orders.status', $order), [
             'status' => 'PROCESSING',
-        ])->assertNotFound();
+        ])->assertRedirect();
+        $this->assertSame('PROCESSING', $order->fresh()->status);
     }
 
     public function test_admin_and_agent_orders_index_show_package_column(): void
