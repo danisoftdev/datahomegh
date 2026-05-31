@@ -307,6 +307,16 @@ class DataPackageFulfillmentTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://provider.test/v1/place-order');
     }
 
+    public function test_admin_fulfillment_apis_index_renders(): void
+    {
+        $supplier = $this->supplier();
+
+        $this->actingAs($supplier)
+            ->get(route('admin.fulfillment-apis.index'))
+            ->assertOk()
+            ->assertSee(__('External data APIs'), false);
+    }
+
     public function test_admin_cannot_save_iget_console_url_as_api_base(): void
     {
         $supplier = $this->supplier();

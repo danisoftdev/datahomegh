@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FulfillmentApiProfile;
+use App\Support\EncartaMtnNetwork;
 use App\Support\FulfillmentProviderType;
+use App\Support\GeonetMtnNetworkKey;
+use App\Support\IgetTelecelBundleType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +30,7 @@ class AdminFulfillmentApiController extends Controller
         return view('admin.fulfillment-apis.index', [
             'profiles' => $profiles,
             'providerTypes' => FulfillmentProviderType::labels(),
+            'fulfillmentProviderDefaults' => $this->fulfillmentProviderDefaults(),
         ]);
     }
 
@@ -183,5 +187,39 @@ class AdminFulfillmentApiController extends Controller
         }
 
         return filled($submitted) ? trim((string) $submitted) : null;
+    }
+
+    /**
+     * @return array<string, array{network: string, baseUrl: string, baseHint: string, autoKeyNote: string, keyLabel: string}>
+     */
+    private function fulfillmentProviderDefaults(): array
+    {
+        return [
+            'iget' => [
+                'network' => 'Telecel',
+                'baseUrl' => config('datahome.fulfillment.providers.iget.default_base_url'),
+                'baseHint' => __('iGet API host only (not console.igetghana.com). Calls: {base}/api/developer/orders/place'),
+                'autoKeyNote' => __('Telecel bundleType :type is applied automatically for all Telecel data orders.', [
+                    'type' => IgetTelecelBundleType::resolve(),
+                ]),
+                'keyLabel' => __('iGet API key (X-API-Key)'),
+            ],
+            'geonet' => [
+                'network' => 'MTN',
+                'baseUrl' => config('datahome.fulfillment.providers.geonet.default_base_url'),
+                'baseHint' => __('Geonettech API base. Calls: {base}/v1/place-order'),
+                'autoKeyNote' => __('MTN uses Geonettech network_key :key automatically.', [
+                    'key' => GeonetMtnNetworkKey::resolve(),
+                ]),
+                'keyLabel' => __('Geonettech Bearer token'),
+            ],
+            'encarta' => [
+                'network' => 'MTN',
+                'baseUrl' => config('datahome.fulfillment.providers.encarta.default_base_url'),
+                'baseHint' => __('Encarta API base. MTN data uses POST /purchase with networkKey YELLO.'),
+                'autoKeyNote' => __('MTN Encarta sends POST /purchase automatically (networkKey YELLO, recipient, volume_mb, reference).'),
+                'keyLabel' => __('Encarta X-API-Key'),
+            ],
+        ];
     }
 }
