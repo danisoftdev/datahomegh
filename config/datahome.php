@@ -27,6 +27,8 @@ return [
                 'default_base_url' => env('FULFILLMENT_ENCARTA_BASE_URL', 'https://encartastores.com/api'),
                 'place_path' => env('FULFILLMENT_ENCARTA_PLACE_PATH', '/purchase'),
                 'status_path' => env('FULFILLMENT_ENCARTA_STATUS_PATH', '/ishare-status'),
+                'webhook_secret' => env('FULFILLMENT_ENCARTA_WEBHOOK_SECRET', 'direct'),
+                'webhook_url' => env('FULFILLMENT_ENCARTA_WEBHOOK_URL'),
             ],
         ],
         'fallback_codes' => [

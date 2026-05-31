@@ -21,6 +21,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\BuyerOrderController;
 use App\Http\Controllers\BuyerProfileController;
+use App\Http\Controllers\EncartaWebhookController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PasswordResetController;
@@ -65,6 +66,9 @@ Route::post('/logout', [AuthController::class, 'logout'])
 
 Route::post('/wallet/paystack/webhook', [WalletController::class, 'webhook'])
     ->name('wallet.paystack.webhook');
+
+Route::post('/webhooks/encarta', EncartaWebhookController::class)
+    ->name('webhooks.encarta');
 
 Route::match(['get', 'post'], '/wallet/topup/callback', [WalletController::class, 'callback'])
     ->name('wallet.topup.callback');

@@ -217,7 +217,9 @@ class AdminFulfillmentApiController extends Controller
                 'network' => 'MTN',
                 'baseUrl' => config('datahome.fulfillment.providers.encarta.default_base_url'),
                 'baseHint' => __('Encarta API base. MTN data uses POST /purchase with networkKey YELLO.'),
-                'autoKeyNote' => __('MTN Encarta sends POST /purchase automatically (networkKey YELLO, recipient, volume_mb, reference).'),
+                'autoKeyNote' => __('MTN Encarta: POST /purchase (networkKey YELLO, recipient, capacity GB). Status updates via webhook :url or Encarta Credentials global URL.', [
+                    'url' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
+                ]),
                 'keyLabel' => __('Encarta X-API-Key'),
             ],
         ];
