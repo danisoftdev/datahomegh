@@ -7,8 +7,10 @@ use App\Models\FulfillmentApiProfile;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Fulfillment\EncartaFulfillmentClient;
 use App\Services\Fulfillment\GeonetFulfillmentClient;
 use App\Services\Fulfillment\IgetFulfillmentClient;
+use App\Support\EncartaMtnNetwork;
 use App\Support\FulfillmentProviderType;
 use App\Support\GeonetMtnNetworkKey;
 use App\Support\IgetTelecelBundleType;
@@ -18,6 +20,7 @@ final class DataPackageFulfillmentService
     public function __construct(
         private readonly IgetFulfillmentClient $igetClient,
         private readonly GeonetFulfillmentClient $geonetClient,
+        private readonly EncartaFulfillmentClient $encartaClient,
     ) {}
 
     /**
@@ -66,6 +69,7 @@ final class DataPackageFulfillmentService
         $result = match ($profile->provider_type) {
             FulfillmentProviderType::IGET => $this->igetClient->place($order, $bundle, $profile, $productCode),
             FulfillmentProviderType::GEONET => $this->geonetClient->place($order, $bundle, $profile, $productCode),
+            FulfillmentProviderType::ENCARTA => $this->encartaClient->place($order, $bundle, $profile, $productCode),
             default => ['ok' => false, 'message' => __('Unknown API provider type.')],
         };
 
@@ -103,6 +107,7 @@ final class DataPackageFulfillmentService
         $result = match ($profile->provider_type) {
             FulfillmentProviderType::IGET => $this->igetClient->refreshStatus($order, $profile, $ref),
             FulfillmentProviderType::GEONET => $this->geonetClient->refreshStatus($order, $profile, $ref),
+            FulfillmentProviderType::ENCARTA => $this->encartaClient->refreshStatus($order, $profile, $ref),
             default => ['ok' => false, 'message' => __('Unknown API provider type.')],
         };
 
@@ -149,6 +154,11 @@ final class DataPackageFulfillmentService
             return GeonetMtnNetworkKey::resolve();
         }
 
+        if ($profile->provider_type === FulfillmentProviderType::ENCARTA
+            && EncartaMtnNetwork::isMtnNetwork((string) $order->network)) {
+            return EncartaMtnNetwork::resolve();
+        }
+
         if ($profile->provider_type === FulfillmentProviderType::IGET
             && IgetTelecelBundleType::isTelecelNetwork((string) $order->network)) {
             $resolved = IgetTelecelBundleType::resolve();
@@ -176,6 +186,7 @@ final class DataPackageFulfillmentService
     {
         return match ($profile->provider_type) {
             FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
+            FulfillmentProviderType::ENCARTA => __('Encarta MTN network label is not configured.'),
             FulfillmentProviderType::IGET => __('iGet Telecel bundleType is not configured. Set FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE in .env (default Telecel-5959).'),
             default => __('No provider product code configured for this order.'),
         };

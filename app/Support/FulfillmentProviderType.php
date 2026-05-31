@@ -8,6 +8,8 @@ final class FulfillmentProviderType
 
     public const GEONET = 'geonet';
 
+    public const ENCARTA = 'encarta';
+
     /**
      * @return array<string, string>
      */
@@ -16,6 +18,7 @@ final class FulfillmentProviderType
         return [
             self::IGET => 'iGet',
             self::GEONET => 'Geonettech',
+            self::ENCARTA => 'Encarta Stores',
         ];
     }
 
@@ -24,7 +27,7 @@ final class FulfillmentProviderType
      */
     public static function all(): array
     {
-        return [self::IGET, self::GEONET];
+        return [self::IGET, self::GEONET, self::ENCARTA];
     }
 
     public static function isValid(string $type): bool
@@ -39,7 +42,7 @@ final class FulfillmentProviderType
     {
         return match ($providerType) {
             self::IGET => ['Telecel'],
-            self::GEONET => ['MTN'],
+            self::GEONET, self::ENCARTA => ['MTN'],
             default => [],
         };
     }

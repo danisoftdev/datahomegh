@@ -128,6 +128,7 @@ class AdminFulfillmentApiController extends Controller
     {
         $normalized = match ($providerType) {
             FulfillmentProviderType::GEONET => FulfillmentApiProfile::normalizeGeonetBaseUrl($baseUrl),
+            FulfillmentProviderType::ENCARTA => FulfillmentApiProfile::normalizeEncartaBaseUrl($baseUrl),
             default => FulfillmentApiProfile::normalizeBaseUrl($baseUrl),
         };
 
@@ -177,7 +178,7 @@ class AdminFulfillmentApiController extends Controller
 
     private function normalizeDefaultProductCode(string $providerType, mixed $submitted): ?string
     {
-        if (in_array($providerType, [FulfillmentProviderType::GEONET, FulfillmentProviderType::IGET], true)) {
+        if (in_array($providerType, [FulfillmentProviderType::GEONET, FulfillmentProviderType::IGET, FulfillmentProviderType::ENCARTA], true)) {
             return null;
         }
 

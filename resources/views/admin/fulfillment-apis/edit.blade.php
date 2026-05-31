@@ -32,6 +32,8 @@
                 <p class="mt-1 text-xs text-slate-500">
                     @if ($profile->isGeonet())
                         {{ __('Geonettech base, e.g. :api', ['api' => config('datahome.fulfillment.providers.geonet.default_base_url')]) }}
+                    @elseif ($profile->isEncarta())
+                        {{ __('Encarta base, e.g. :api', ['api' => config('datahome.fulfillment.providers.encarta.default_base_url')]) }}
                     @else
                         {{ __('iGet API host only — not console.igetghana.com. Example: :api', ['api' => config('datahome.fulfillment.providers.iget.default_base_url')]) }}
                     @endif
@@ -44,6 +46,13 @@
                 <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
                     {{ __('MTN Geonettech network_key (:key) is applied automatically for all MTN data orders.', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}
                 </p>
+            @elseif ($profile->isEncarta())
+                <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+                    {{ __('MTN Encarta uses POST :path with phone, volume (GB from bundle size), and order reference. Status via GET :status.', [
+                        'path' => config('datahome.fulfillment.providers.encarta.place_path', '/ishare'),
+                        'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
+                    ]) }}
+                </p>
             @else
                 <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
                     {{ __('Telecel iGet bundleType (:type) is applied automatically for all Telecel data orders.', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}
@@ -51,7 +60,11 @@
             @endif
             <div>
                 <label class="mb-1 block text-sm text-slate-400">
-                    {{ $profile->isGeonet() ? __('New Bearer token (leave blank to keep current)') : __('New API key (leave blank to keep current)') }}
+                    @if ($profile->isGeonet())
+                        {{ __('New Bearer token (leave blank to keep current)') }}
+                    @else
+                        {{ __('New API key (leave blank to keep current)') }}
+                    @endif
                 </label>
                 <input type="password" name="api_key" value="" autocomplete="new-password" maxlength="2000" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
                 @error('api_key')
