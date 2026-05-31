@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\Fulfillment\EncartaWebhookService;
 use App\Support\FulfillmentProviderType;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -416,9 +417,10 @@ class DataPackageFulfillmentTest extends TestCase
             return $request->url() === 'https://provider.test/api/purchase'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
                 && $request['recipient'] === '0244123456'
-                && $request['volume_mb'] === 2048
+                && $request['capacity'] === 2
                 && $request['networkKey'] === 'YELLO'
-                && $request['reference'] === (string) $order->id;
+                && $request['reference'] === (string) $order->id
+                && $request['webhook_url'] === EncartaWebhookService::webhookUrl();
         });
 
         $this->assertSame('ENC-123', $order->provider_order_reference);

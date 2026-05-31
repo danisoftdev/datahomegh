@@ -21,16 +21,17 @@ final class EncartaFulfillmentClient
         $placePath = (string) config('datahome.fulfillment.providers.encarta.place_path', '/purchase');
         $url = $base.$placePath;
         $ref = (string) $order->id;
-        $volumeMb = $this->volumeMbForBundle($bundle);
+        $capacity = $this->capacityForBundle($bundle);
 
         $payload = [
             'recipient' => GhanaPhoneNumber::forLocal((string) $order->phone_number),
-            'volume_mb' => $volumeMb,
+            'capacity' => $capacity,
             'reference' => $ref,
         ];
 
         if ($this->usesPurchaseEndpoint($placePath)) {
             $payload['networkKey'] = strtoupper(trim($network));
+            $payload['webhook_url'] = EncartaWebhookService::webhookUrl();
         }
 
         try {
@@ -168,13 +169,13 @@ final class EncartaFulfillmentClient
         return is_string($status) && $status !== '' ? $status : null;
     }
 
-    private function volumeMbForBundle(BundlePackage $bundle): int
+    private function capacityForBundle(BundlePackage $bundle): int
     {
         if (preg_match('/(\d+)/', (string) $bundle->size_label, $matches)) {
-            return max(1024, (int) $matches[1] * 1024);
+            return max(1, (int) $matches[1]);
         }
 
-        return 1024;
+        return 1;
     }
 
     private function usesPurchaseEndpoint(string $placePath): bool
