@@ -178,7 +178,7 @@ final class DataPackageFulfillmentService
     {
         return match ($profile->provider_type) {
             FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
-            FulfillmentProviderType::ENCARTA => __('Encarta MTN network label is not configured.'),
+            FulfillmentProviderType::ENCARTA => __('Encarta MTN networkKey is not configured. Set FULFILLMENT_ENCARTA_MTN_NETWORK_KEY in .env (default YELLO).'),
             FulfillmentProviderType::IGET => __('iGet Telecel bundleType is not configured. Set FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE in .env (default Telecel-5959).'),
             default => __('No provider product code configured for this order.'),
         };

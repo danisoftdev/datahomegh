@@ -28,7 +28,7 @@
             <strong class="text-violet-200">{{ __('MTN — Encarta Stores') }}</strong><br>
             {{ __('Base: :api. Auth: X-API-Key from API Management. POST :path · GET :status.', [
                 'api' => config('datahome.fulfillment.providers.encarta.default_base_url'),
-                'path' => config('datahome.fulfillment.providers.encarta.place_path', '/ishare'),
+                'path' => config('datahome.fulfillment.providers.encarta.place_path', '/purchase'),
                 'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
             ]) }}
         </p>
@@ -118,8 +118,8 @@
                 encarta: {
                     network: 'MTN',
                     baseUrl: @json(config('datahome.fulfillment.providers.encarta.default_base_url')),
-                    baseHint: @json(__('Encarta API base. Calls: {base}/ishare (MTN data)')),
-                    autoKeyNote: @json(__('MTN Encarta: recipient + volume_mb (from bundle size) + order reference sent to /ishare automatically.')),
+                    baseHint: @json(__('Encarta API base. MTN data: {base}/purchase with networkKey YELLO')),
+                    autoKeyNote: @json(__('MTN Encarta: POST /purchase with networkKey :key, recipient, volume_mb, reference.', ['key' => \App\Support\EncartaMtnNetwork::resolve()])),
                     keyLabel: @json(__('Encarta X-API-Key')),
                 },
             };
@@ -176,7 +176,7 @@
                         @if ($profile->isGeonet())
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN API key:') }} <span class="font-mono text-slate-300">{{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span></p>
                         @elseif ($profile->isEncarta())
-                            <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/ishare') }}</span></p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/purchase') }}</span> · networkKey <span class="font-mono text-slate-300">{{ \App\Support\EncartaMtnNetwork::resolve() }}</span></p>
                         @elseif ($profile->isIget())
                             <p class="mt-1 text-xs text-slate-500">{{ __('Telecel bundleType:') }} <span class="font-mono text-slate-300">{{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span></p>
                         @endif

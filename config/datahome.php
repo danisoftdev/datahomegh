@@ -10,7 +10,7 @@ return [
     | provider_type on each API profile selects the client:
     | - iget: Telecel (bundleType, X-API-Key)
     | - geonet: MTN (network_key, Bearer token)
-    | - encarta: MTN (X-API-Key, POST /ishare or /purchase)
+    | - encarta: MTN (X-API-Key, POST /purchase with networkKey YELLO)
     |
     | geonet / encarta / iget product codes are fixed from config, not bundle labels.
     |
@@ -25,7 +25,7 @@ return [
             ],
             'encarta' => [
                 'default_base_url' => env('FULFILLMENT_ENCARTA_BASE_URL', 'https://encartastores.com/api'),
-                'place_path' => env('FULFILLMENT_ENCARTA_PLACE_PATH', '/ishare'),
+                'place_path' => env('FULFILLMENT_ENCARTA_PLACE_PATH', '/purchase'),
                 'status_path' => env('FULFILLMENT_ENCARTA_STATUS_PATH', '/ishare-status'),
             ],
         ],
@@ -37,7 +37,7 @@ return [
                 'MTN' => env('FULFILLMENT_GEONET_MTN_NETWORK_KEY', 'YELLO'),
             ],
             'encarta' => [
-                'MTN' => env('FULFILLMENT_ENCARTA_MTN_NETWORK', 'MTN'),
+                'MTN' => env('FULFILLMENT_ENCARTA_MTN_NETWORK_KEY', 'YELLO'),
             ],
         ],
     ],
