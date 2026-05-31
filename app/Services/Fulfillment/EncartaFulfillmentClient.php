@@ -24,7 +24,7 @@ final class EncartaFulfillmentClient
         $volumeGb = $this->capacityGbForBundle($bundle);
 
         $payload = [
-            'recipient' => GhanaPhoneNumber::forApi((string) $order->phone_number),
+            'recipient' => GhanaPhoneNumber::forLocal((string) $order->phone_number),
             'volume' => $volumeGb,
             'reference' => $ref,
         ];

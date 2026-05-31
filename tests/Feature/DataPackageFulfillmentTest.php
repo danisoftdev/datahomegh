@@ -405,7 +405,7 @@ class DataPackageFulfillmentTest extends TestCase
         Http::assertSent(function ($request) use ($order) {
             return $request->url() === 'https://provider.test/api/ishare'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
-                && $request['recipient'] === '233244123456'
+                && $request['recipient'] === '0244123456'
                 && $request['volume'] === 2
                 && $request['reference'] === (string) $order->id;
         });
