@@ -21,11 +21,11 @@ final class EncartaFulfillmentClient
         $placePath = (string) config('datahome.fulfillment.providers.encarta.place_path', '/ishare');
         $url = $base.$placePath;
         $ref = (string) $order->id;
-        $volumeGb = $this->capacityGbForBundle($bundle);
+        $volumeMb = $this->volumeMbForBundle($bundle);
 
         $payload = [
             'recipient' => GhanaPhoneNumber::forLocal((string) $order->phone_number),
-            'volume' => $volumeGb,
+            'volume_mb' => $volumeMb,
             'reference' => $ref,
         ];
 
@@ -168,13 +168,13 @@ final class EncartaFulfillmentClient
         return is_string($status) && $status !== '' ? $status : null;
     }
 
-    private function capacityGbForBundle(BundlePackage $bundle): int
+    private function volumeMbForBundle(BundlePackage $bundle): int
     {
         if (preg_match('/(\d+)/', (string) $bundle->size_label, $matches)) {
-            return max(1, (int) $matches[1]);
+            return max(1024, (int) $matches[1] * 1024);
         }
 
-        return 1;
+        return 1024;
     }
 
     private function httpErrorMessage(int $code, string $url, string $body): string

@@ -406,7 +406,7 @@ class DataPackageFulfillmentTest extends TestCase
             return $request->url() === 'https://provider.test/api/ishare'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
                 && $request['recipient'] === '0244123456'
-                && $request['volume'] === 2
+                && $request['volume_mb'] === 2048
                 && $request['reference'] === (string) $order->id;
         });
 
