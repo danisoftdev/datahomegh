@@ -220,12 +220,23 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', function () {
         $user = auth()->user()?->loadMissing('role');
 
-        return match ($user?->role?->slug) {
-            Role::SLUG_SUPPLIER => redirect()->route('admin.dashboard'),
-            Role::SLUG_AGENT => redirect()->route('agent.dashboard'),
-            Role::SLUG_BUYER => redirect()->route('buyer.dashboard'),
-            default => redirect('/'),
-        };
+        if ($user === null) {
+            return redirect('/');
+        }
+
+        if ($user->isSupplier()) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        if ($user->canAccessAgentArea()) {
+            return redirect()->route('agent.dashboard');
+        }
+
+        if ($user->canAccessBuyerArea()) {
+            return redirect()->route('buyer.dashboard');
+        }
+
+        return redirect('/');
     })->name('dashboard');
 });
 

@@ -315,11 +315,18 @@ class AuthController extends Controller
 
     private function dashboardPathForUser(User $user): string
     {
-        return match ($user->role?->slug) {
-            Role::SLUG_SUPPLIER => route('admin.dashboard', [], false),
-            Role::SLUG_AGENT => route('agent.dashboard', [], false),
-            Role::SLUG_BUYER => route('buyer.dashboard', [], false),
-            default => '/',
-        };
+        if ($user->isSupplier()) {
+            return route('admin.dashboard', [], false);
+        }
+
+        if ($user->canAccessAgentArea()) {
+            return route('agent.dashboard', [], false);
+        }
+
+        if ($user->canAccessBuyerArea()) {
+            return route('buyer.dashboard', [], false);
+        }
+
+        return '/';
     }
 }

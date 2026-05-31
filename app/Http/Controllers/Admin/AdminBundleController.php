@@ -9,6 +9,7 @@ use App\Models\RolePrice;
 use App\Support\BundlePackageKind;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -28,10 +29,10 @@ class AdminBundleController extends Controller
     public function create(): View
     {
         $networks = ['MTN', 'Telecel', 'AirtelTigo'];
-        $buyerListPrice = null;
-        $agentListPrice = null;
+        $pricingRoles = Role::platformPricingQuery()->get();
+        $roleListPrices = [];
 
-        return view('admin.bundles.create', compact('networks', 'buyerListPrice', 'agentListPrice'));
+        return view('admin.bundles.create', compact('networks', 'pricingRoles', 'roleListPrices'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -52,10 +53,10 @@ class AdminBundleController extends Controller
         $this->assertSupplierBundle($bundle);
 
         $networks = ['MTN', 'Telecel', 'AirtelTigo'];
-        $buyerListPrice = $this->roleListPriceForBundle($bundle, Role::SLUG_BUYER);
-        $agentListPrice = $this->roleListPriceForBundle($bundle, Role::SLUG_AGENT);
+        $pricingRoles = Role::platformPricingQuery()->get();
+        $roleListPrices = $this->roleListPricesForBundle($bundle, $pricingRoles);
 
-        return view('admin.bundles.edit', compact('bundle', 'networks', 'buyerListPrice', 'agentListPrice'));
+        return view('admin.bundles.edit', compact('bundle', 'networks', 'pricingRoles', 'roleListPrices'));
     }
 
     public function update(Request $request, BundlePackage $bundle): RedirectResponse
@@ -150,72 +151,71 @@ class AdminBundleController extends Controller
         abort_unless($bundle->agent_id === null, 404);
     }
 
-    private function roleListPriceForBundle(BundlePackage $bundle, string $roleSlug): ?string
+    /**
+     * @param  Collection<int, Role>  $pricingRoles
+     * @return array<int, string|null>
+     */
+    private function roleListPricesForBundle(BundlePackage $bundle, Collection $pricingRoles): array
     {
-        $roleId = Role::query()->where('slug', $roleSlug)->value('id');
-        if ($roleId === null) {
-            return null;
+        $rows = RolePrice::query()
+            ->where('bundle_package_id', $bundle->id)
+            ->whereIn('role_id', $pricingRoles->pluck('id'))
+            ->get()
+            ->keyBy('role_id');
+
+        $prices = [];
+        foreach ($pricingRoles as $role) {
+            $prices[$role->id] = isset($rows[$role->id]) ? (string) $rows[$role->id]->price : null;
         }
 
-        $row = RolePrice::query()
-            ->where('bundle_package_id', $bundle->id)
-            ->where('role_id', (int) $roleId)
-            ->first();
-
-        return $row !== null ? (string) $row->price : null;
+        return $prices;
     }
 
     /**
-     * @return array{buyer_list_price: string|null, agent_list_price: string|null}
+     * @return array<int, string|null>
      */
     private function validatedRoleListPrices(Request $request, string $packageKind): array
     {
         if (BundlePackageKind::isMtnAfa($packageKind)) {
-            return ['buyer_list_price' => null, 'agent_list_price' => null];
+            return [];
         }
 
+        $pricingRoleIds = Role::platformPricingQuery()->pluck('id')->all();
+
         $data = $request->validate([
-            'buyer_list_price' => ['nullable', 'numeric', 'min:0.01', 'max:999999'],
-            'agent_list_price' => ['nullable', 'numeric', 'min:0.01', 'max:999999'],
+            'role_list_prices' => ['nullable', 'array'],
+            'role_list_prices.*' => ['nullable', 'numeric', 'min:0.01', 'max:999999'],
         ]);
 
-        $buyer = isset($data['buyer_list_price']) && $data['buyer_list_price'] !== ''
-            ? number_format((float) $data['buyer_list_price'], 2, '.', '')
-            : null;
-        $agent = isset($data['agent_list_price']) && $data['agent_list_price'] !== ''
-            ? number_format((float) $data['agent_list_price'], 2, '.', '')
-            : null;
+        $submitted = $data['role_list_prices'] ?? [];
+        $normalized = [];
 
-        return [
-            'buyer_list_price' => $buyer,
-            'agent_list_price' => $agent,
-        ];
+        foreach ($pricingRoleIds as $roleId) {
+            $raw = $submitted[(string) $roleId] ?? $submitted[$roleId] ?? null;
+            if ($raw === null || $raw === '') {
+                $normalized[(int) $roleId] = null;
+
+                continue;
+            }
+
+            $normalized[(int) $roleId] = number_format((float) $raw, 2, '.', '');
+        }
+
+        return $normalized;
     }
 
     /**
-     * @param  array{buyer_list_price: string|null, agent_list_price: string|null}  $prices
+     * @param  array<int, string|null>  $prices
      */
     private function syncPlatformBundleRolePrices(BundlePackage $bundle, array $prices): void
     {
-        $buyerRoleId = Role::query()->where('slug', Role::SLUG_BUYER)->value('id');
-        $agentRoleId = Role::query()->where('slug', Role::SLUG_AGENT)->value('id');
-        if ($buyerRoleId === null || $agentRoleId === null) {
-            return;
-        }
-
-        $buyerRoleId = (int) $buyerRoleId;
-        $agentRoleId = (int) $agentRoleId;
-
         if ($bundle->isMtnAfaRegistration()) {
-            RolePrice::query()
-                ->where('bundle_package_id', $bundle->id)
-                ->whereIn('role_id', [$buyerRoleId, $agentRoleId])
-                ->delete();
+            RolePrice::query()->where('bundle_package_id', $bundle->id)->delete();
 
             return;
         }
 
-        foreach ([$buyerRoleId => $prices['buyer_list_price'], $agentRoleId => $prices['agent_list_price']] as $roleId => $price) {
+        foreach ($prices as $roleId => $price) {
             if ($price === null) {
                 RolePrice::query()
                     ->where('bundle_package_id', $bundle->id)

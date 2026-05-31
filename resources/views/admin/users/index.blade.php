@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-2xl font-bold text-white">{{ __('Agents & buyers') }}</h1>
+        <h1 class="text-2xl font-bold text-white">{{ __('Users') }}</h1>
         <a href="{{ route('admin.users.create-agent') }}" class="rounded-lg bg-[#FFD700] px-4 py-2 text-sm font-semibold text-[#1A1A2E] hover:brightness-95">
             {{ __('Create agent') }}
         </a>
@@ -14,8 +14,9 @@
     <form method="get" class="mb-6 flex flex-wrap gap-3 rounded-xl border border-white/10 bg-[#16213E]/60 p-4">
         <select name="role" class="rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white">
             <option value="">{{ __('All roles') }}</option>
-            <option value="{{ \App\Models\Role::SLUG_AGENT }}" @selected(request('role') === \App\Models\Role::SLUG_AGENT)>{{ __('Agents') }}</option>
-            <option value="{{ \App\Models\Role::SLUG_BUYER }}" @selected(request('role') === \App\Models\Role::SLUG_BUYER)>{{ __('Buyers') }}</option>
+            @foreach (\App\Models\Role::query()->where('slug', '!=', \App\Models\Role::SLUG_SUPPLIER)->orderBy('name')->get() as $filterRole)
+                <option value="{{ $filterRole->slug }}" @selected(request('role') === $filterRole->slug)>{{ $filterRole->name }}</option>
+            @endforeach
         </select>
         <select name="status" class="rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white">
             <option value="">{{ __('Any status') }}</option>

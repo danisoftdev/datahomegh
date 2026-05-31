@@ -33,6 +33,29 @@
             @enderror
         </div>
 
+        @if ($role->isCustomRole())
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="pricing_persona" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Checkout experience') }}</label>
+                    <select id="pricing_persona" name="pricing_persona" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white">
+                        <option value="buyer" @selected(old('pricing_persona', $role->pricing_persona) === 'buyer')>{{ __('Buyer-style platform catalogue') }}</option>
+                        <option value="agent" @selected(old('pricing_persona', $role->pricing_persona) === 'agent')>{{ __('Agent-style platform wholesale catalogue') }}</option>
+                    </select>
+                </div>
+                <div class="rounded-lg border border-white/10 bg-[#1A1A2E]/50 p-4 space-y-3">
+                    <label class="flex items-center gap-2 text-sm text-slate-300">
+                        <input type="hidden" name="requires_promotion_fee" value="0" />
+                        <input type="checkbox" name="requires_promotion_fee" value="1" class="size-4 rounded border-white/20" @checked(old('requires_promotion_fee', $role->requires_promotion_fee)) />
+                        {{ __('Charge promotion fee from wallet') }}
+                    </label>
+                    <input id="promotion_fee" name="promotion_fee" type="number" step="0.01" min="0" value="{{ old('promotion_fee', $role->promotion_fee) }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('GHS') }}" />
+                </div>
+            </div>
+            <p class="text-xs text-slate-500">{{ __('This role never appears on public registration. Set data prices per bundle under Admin → Bundles.') }}</p>
+        @else
+            <p class="text-sm text-slate-400">{{ __('System role — registration and promotion rules are fixed.') }}</p>
+        @endif
+
         <div>
             <h2 class="mb-4 text-lg font-semibold text-white">{{ __('Permissions') }}</h2>
             <div class="space-y-8">

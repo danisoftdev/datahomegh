@@ -53,21 +53,18 @@
     @if ($showRoleListPrices)
         <div class="rounded-lg border border-white/10 bg-[#1A1A2E]/50 p-4 space-y-3">
             <p class="text-sm font-medium text-slate-200">{{ __('Role list prices (data bundles only)') }}</p>
-            <p class="text-xs text-slate-500">{{ __('Optional. When set, buyers see the buyer price and agents see the agent price for this platform bundle. Leave blank to use the base price for that role. Agent shop resale bundles are still priced by each agent; this does not change that.') }}</p>
-            <div>
-                <label class="mb-1 block text-sm text-slate-400">{{ __('Buyer list price (GHS)') }}</label>
-                <input type="number" step="0.01" min="0.01" name="buyer_list_price" value="{{ old('buyer_list_price', $buyerListPrice ?? '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('Same as base if empty') }}" />
-                @error('buyer_list_price')
-                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                @enderror
-            </div>
-            <div>
-                <label class="mb-1 block text-sm text-slate-400">{{ __('Agent list price (GHS)') }}</label>
-                <input type="number" step="0.01" min="0.01" name="agent_list_price" value="{{ old('agent_list_price', $agentListPrice ?? '') }}" class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('Same as base if empty') }}" />
-                @error('agent_list_price')
-                    <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                @enderror
-            </div>
+            <p class="text-xs text-slate-500">{{ __('Optional per-role prices for platform bundles. Users see the price for their current role immediately after you promote them. Leave blank to use the base price. Agent shop resale bundles are still priced by each agent.') }}</p>
+            @foreach ($pricingRoles ?? [] as $pricingRole)
+                <div>
+                    <label class="mb-1 block text-sm text-slate-400">{{ $pricingRole->name }} ({{ __('GHS') }})</label>
+                    <input type="number" step="0.01" min="0.01" name="role_list_prices[{{ $pricingRole->id }}]"
+                        value="{{ old('role_list_prices.'.$pricingRole->id, $roleListPrices[$pricingRole->id] ?? '') }}"
+                        class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" placeholder="{{ __('Same as base if empty') }}" />
+                    @error('role_list_prices.'.$pricingRole->id)
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+            @endforeach
         </div>
     @endif
     <div>

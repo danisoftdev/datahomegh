@@ -49,7 +49,7 @@ class BuyerOrderController extends Controller
         $user = $request->user();
 
         $networks = ['MTN', 'Telecel', 'AirtelTigo', 'MTN_AFA'];
-        $bundles = BundleCatalog::forBuyer($user);
+        $bundles = BundleCatalog::forUser($user);
 
         $bundlesJson = $bundles->map(function ($b) use ($user): array {
             return [
@@ -88,7 +88,7 @@ class BuyerOrderController extends Controller
             return $this->storeBatch($request);
         }
 
-        $bundle = BundleCatalog::forBuyer($request->user())
+        $bundle = BundleCatalog::forUser($request->user())
             ->firstWhere('id', (int) $request->input('bundle_package_id'));
 
         if ($bundle === null) {
@@ -139,7 +139,7 @@ class BuyerOrderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $result = OrderCartItemsValidator::validate($request, $user, BundleCatalog::forBuyer($user));
+        $result = OrderCartItemsValidator::validate($request, $user, BundleCatalog::forUser($user));
 
         if (! $result['ok']) {
             return back()->withInput()->withErrors($result['errors']);

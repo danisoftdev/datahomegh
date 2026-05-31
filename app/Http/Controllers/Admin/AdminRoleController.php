@@ -39,6 +39,9 @@ class AdminRoleController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', Rule::unique(Role::class, 'name')],
+            'pricing_persona' => ['required', Rule::in([Role::PERSONA_BUYER, Role::PERSONA_AGENT])],
+            'requires_promotion_fee' => ['sometimes', 'boolean'],
+            'promotion_fee' => ['nullable', 'numeric', 'min:0', 'max:999999'],
         ]);
 
         $slug = $this->makeUniqueSlug(Str::slug($data['name']));
@@ -47,6 +50,12 @@ class AdminRoleController extends Controller
             'name' => $data['name'],
             'slug' => $slug,
             'is_enabled' => true,
+            'available_at_registration' => false,
+            'pricing_persona' => $data['pricing_persona'],
+            'requires_promotion_fee' => $request->boolean('requires_promotion_fee'),
+            'promotion_fee' => $request->boolean('requires_promotion_fee') && isset($data['promotion_fee'])
+                ? number_format((float) $data['promotion_fee'], 2, '.', '')
+                : null,
         ]);
 
         return redirect()
@@ -82,13 +91,31 @@ class AdminRoleController extends Controller
 
     public function update(Request $request, Role $role): RedirectResponse
     {
-        $data = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:100', Rule::unique(Role::class, 'name')->ignore($role->id)],
             'permission_ids' => ['nullable', 'array'],
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
-        ]);
+        ];
+
+        if ($role->isCustomRole()) {
+            $rules['pricing_persona'] = ['required', Rule::in([Role::PERSONA_BUYER, Role::PERSONA_AGENT])];
+            $rules['requires_promotion_fee'] = ['sometimes', 'boolean'];
+            $rules['promotion_fee'] = ['nullable', 'numeric', 'min:0', 'max:999999'];
+        }
+
+        $data = $request->validate($rules);
 
         $role->name = $data['name'];
+
+        if ($role->isCustomRole()) {
+            $role->pricing_persona = $data['pricing_persona'];
+            $role->requires_promotion_fee = $request->boolean('requires_promotion_fee');
+            $role->promotion_fee = $role->requires_promotion_fee && isset($data['promotion_fee'])
+                ? number_format((float) $data['promotion_fee'], 2, '.', '')
+                : null;
+            $role->available_at_registration = false;
+        }
+
         $role->save();
 
         $ids = array_values(array_unique(array_map('intval', $data['permission_ids'] ?? [])));

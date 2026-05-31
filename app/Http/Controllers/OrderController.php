@@ -117,6 +117,13 @@ class OrderController extends Controller
             return;
         }
 
+        if ($user->canAccessAgentArea() && $user->hasAgentShop()) {
+            $order->loadMissing('user');
+            abort_unless((int) $order->user?->agent_id === (int) $user->id, 403);
+
+            return;
+        }
+
         if ($user->role?->slug === Role::SLUG_AGENT) {
             $order->loadMissing('user');
             abort_unless((int) $order->user?->agent_id === (int) $user->id, 403);
@@ -138,7 +145,7 @@ class OrderController extends Controller
             return;
         }
 
-        if ($user->role?->slug === Role::SLUG_AGENT) {
+        if (($user->canAccessAgentArea() && $user->hasAgentShop()) || $user->role?->slug === Role::SLUG_AGENT) {
             $order->loadMissing('user');
             if ((int) $order->user?->agent_id === (int) $user->id) {
                 return;

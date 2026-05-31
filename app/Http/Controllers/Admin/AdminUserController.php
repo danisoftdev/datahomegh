@@ -42,13 +42,11 @@ class AdminUserController extends Controller
     {
         $query = User::query()
             ->with(['role', 'wallet'])
-            ->whereHas('role', fn ($q) => $q->whereIn('slug', [Role::SLUG_AGENT, Role::SLUG_BUYER]));
+            ->whereHas('role', fn ($q) => $q->where('slug', '!=', Role::SLUG_SUPPLIER));
 
         if ($request->filled('role')) {
             $slug = $request->string('role')->toString();
-            if (in_array($slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true)) {
-                $query->whereHas('role', fn ($q) => $q->where('slug', $slug));
-            }
+            $query->whereHas('role', fn ($q) => $q->where('slug', $slug));
         }
 
         if ($request->filled('status')) {
@@ -132,10 +130,7 @@ class AdminUserController extends Controller
 
     public function show(User $user): View
     {
-        abort_unless(
-            in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true),
-            404
-        );
+        abort_if($user->isSupplier(), 404);
 
         $user->load('role', 'wallet', 'agent');
 
@@ -363,15 +358,46 @@ class AdminUserController extends Controller
 
         $validated = $request->validate([
             'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'waive_promotion_fee' => ['sometimes', 'boolean'],
         ]);
 
         $role = Role::query()->findOrFail($validated['role_id']);
         abort_if($role->slug === Role::SLUG_SUPPLIER, 403);
 
+        if ((int) $user->role_id === (int) $role->id) {
+            return back()->with('status', __('Role unchanged.'));
+        }
+
+        if ($role->requires_promotion_fee && ! $request->boolean('waive_promotion_fee')) {
+            $fee = $role->promotionFeeAmount();
+            if (bccomp($fee, '0', 2) > 0) {
+                $this->ensureWalletExists($user);
+
+                try {
+                    $this->walletService->debit(
+                        $user->id,
+                        $fee,
+                        'ROLE_PROMOTION',
+                        'role_'.$role->id.'_'.str_replace('.', '', uniqid('', true)),
+                        __('Promotion fee for role :role', ['role' => $role->name]),
+                    );
+                } catch (InsufficientBalanceException) {
+                    return back()->withErrors([
+                        'role_id' => __('User wallet needs :amount GHS for this role (or check “Waive promotion fee”).', [
+                            'amount' => $fee,
+                        ]),
+                    ]);
+                }
+            }
+        }
+
         $user->role_id = $role->id;
+        if ($role->isCustomRole() && $user->status !== 'active') {
+            $user->status = 'active';
+        }
         $user->save();
 
-        return back()->with('status', __('Role updated.'));
+        return back()->with('status', __('Role updated. Platform data prices now follow :role.', ['role' => $role->name]));
     }
 
     public function setDailyLimit(Request $request, User $user): RedirectResponse
@@ -463,10 +489,7 @@ class AdminUserController extends Controller
 
     private function assertWalletManageable(User $user): void
     {
-        abort_unless(
-            in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true),
-            404
-        );
+        abort_if($user->isSupplier(), 404);
     }
 
     private function ensureWalletExists(User $user): void

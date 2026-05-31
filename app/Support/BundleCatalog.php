@@ -9,6 +9,18 @@ use Illuminate\Database\Eloquent\Collection;
 final class BundleCatalog
 {
     /**
+     * Active bundles for checkout based on role persona and whether the user owns a shop.
+     *
+     * @return Collection<int, BundlePackage>
+     */
+    public static function forUser(User $user): Collection
+    {
+        return $user->usesAgentPlatformCatalog()
+            ? self::forAgent($user)
+            : self::forBuyer($user);
+    }
+
+    /**
      * Active bundles a buyer may order: only their agent’s catalogue when linked to an agent;
      * only supplier (platform) bundles when the buyer has no agent.
      *
