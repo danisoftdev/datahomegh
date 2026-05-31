@@ -119,7 +119,7 @@
                     network: 'MTN',
                     baseUrl: @json(config('datahome.fulfillment.providers.encarta.default_base_url')),
                     baseHint: @json(__('Encarta API base. MTN data: {base}/purchase with networkKey YELLO')),
-                    autoKeyNote: @json(__('MTN Encarta: POST /purchase with networkKey :key, recipient, volume_mb, reference.', ['key' => \App\Support\EncartaMtnNetwork::resolve()])),
+                    autoKeyNote: @json(__('MTN Encarta: POST /purchase with networkKey :key — recipient, volume_mb, reference.', ['key' => \App\Support\EncartaMtnNetwork::resolve()])),
                     keyLabel: @json(__('Encarta X-API-Key')),
                 },
             };
