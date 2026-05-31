@@ -234,7 +234,7 @@ class DataPackageFulfillmentTest extends TestCase
         $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
         $this->assertSame((int) $agent->id, (int) $order->agent_id);
         $this->assertSame((string) $order->id, $order->provider_order_reference);
-        $this->assertSame('PROCESSING', $order->status);
+        $this->assertSame('PENDING', $order->status);
     }
 
     #[DataProvider('normalizeBaseUrlProvider')]

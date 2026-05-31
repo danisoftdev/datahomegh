@@ -3,18 +3,11 @@
 namespace App\Services\Fulfillment;
 
 use App\Models\Order;
-use App\Models\User;
-use App\Services\OrderService;
 use App\Support\FulfillmentProviderType;
 use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 
 final class EncartaWebhookService
 {
-    public function __construct(
-        private readonly OrderService $orderService,
-    ) {}
-
     public function verifySignature(string $rawBody, ?string $signatureHeader): bool
     {
         if ($signatureHeader === null || $signatureHeader === '') {
@@ -71,17 +64,11 @@ final class EncartaWebhookService
 
         Order::query()->whereKey($order->id)->update($updates);
 
-        $order->refresh();
-
-        $changedBy = (int) (User::supplierUser()?->id ?? $order->user_id);
-        $note = __('Encarta webhook: :event', ['event' => $event]);
-
-        match ($event) {
-            'order.placed', 'order.processing' => $this->ensureProcessing($order, $changedBy, $note),
-            'order.delivered' => $this->markSent($order, $changedBy, $note),
-            'order.failed' => $this->markFailed($order, $changedBy, $note),
-            default => Log::info('encarta_webhook_unhandled_event', ['event' => $event, 'order_id' => $order->id]),
-        };
+        Log::info('encarta_webhook_provider_status_updated', [
+            'event' => $event,
+            'order_id' => $order->id,
+            'provider_status' => $updates['provider_status'],
+        ]);
     }
 
     public static function webhookUrl(): string
@@ -125,61 +112,5 @@ final class EncartaWebhookService
         $order->loadMissing('fulfillmentApiProfile');
 
         return $order->fulfillmentApiProfile?->provider_type === FulfillmentProviderType::ENCARTA;
-    }
-
-    private function ensureProcessing(Order $order, int $changedBy, string $note): void
-    {
-        if ($order->status === 'PROCESSING') {
-            return;
-        }
-
-        if ($order->status !== 'PENDING') {
-            return;
-        }
-
-        try {
-            $this->orderService->updateStatus((int) $order->id, 'PROCESSING', $changedBy, $note, true);
-        } catch (InvalidArgumentException $e) {
-            Log::info('encarta_webhook_status_skipped', ['order_id' => $order->id, 'message' => $e->getMessage()]);
-        }
-    }
-
-    private function markSent(Order $order, int $changedBy, string $note): void
-    {
-        if ($order->status === 'SENT') {
-            return;
-        }
-
-        if ($order->status === 'PENDING') {
-            $this->ensureProcessing($order->fresh(), $changedBy, $note);
-            $order->refresh();
-        }
-
-        if (! in_array($order->status, ['PROCESSING', 'PENDING'], true)) {
-            return;
-        }
-
-        try {
-            $this->orderService->updateStatus((int) $order->id, 'SENT', $changedBy, $note, true);
-        } catch (InvalidArgumentException $e) {
-            Log::info('encarta_webhook_status_skipped', ['order_id' => $order->id, 'message' => $e->getMessage()]);
-        }
-    }
-
-    private function markFailed(Order $order, int $changedBy, string $note): void
-    {
-        if ($order->status === 'FAILED') {
-            return;
-        }
-
-        if (! in_array($order->status, ['PENDING', 'PROCESSING'], true)) {
-            return;
-        }
-
-        try {
-            $this->orderService->updateStatus((int) $order->id, 'FAILED', $changedBy, $note, true);
-        } catch (InvalidArgumentException $e) {
-            Log::info('encarta_webhook_status_skipped', ['order_id' => $order->id, 'message' => $e->getMessage()]);
-        }
     }
 }

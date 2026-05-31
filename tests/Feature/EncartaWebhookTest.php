@@ -33,7 +33,7 @@ class EncartaWebhookTest extends TestCase
             ->assertStatus(401);
     }
 
-    public function test_encarta_webhook_order_delivered_marks_order_sent(): void
+    public function test_encarta_webhook_order_delivered_updates_provider_status_only(): void
     {
         $supplier = $this->supplier();
         $profile = $this->encartaProfile($supplier);
@@ -73,12 +73,12 @@ class EncartaWebhookTest extends TestCase
 
         $order->refresh();
 
-        $this->assertSame('SENT', $order->status);
+        $this->assertSame('PROCESSING', $order->status);
         $this->assertSame('delivered', $order->provider_status);
         $this->assertSame('PROV_XYZ', $order->provider_order_reference);
     }
 
-    public function test_encarta_webhook_order_failed_marks_order_failed(): void
+    public function test_encarta_webhook_order_failed_updates_provider_status_only(): void
     {
         $supplier = $this->supplier();
         $profile = $this->encartaProfile($supplier);
@@ -110,7 +110,8 @@ class EncartaWebhookTest extends TestCase
         $this->call('POST', route('webhooks.encarta'), [], [], [], $this->signedHeaders($body), $body)
             ->assertOk();
 
-        $this->assertSame('FAILED', $order->fresh()->status);
+        $this->assertSame('PROCESSING', $order->fresh()->status);
+        $this->assertSame('failed', $order->fresh()->provider_status);
     }
 
     private function supplier(): User
