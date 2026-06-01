@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\WalletService;
+use App\Support\AgentShopBuyerPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -73,6 +74,12 @@ class AgentBuyerController extends Controller
         $this->assertAgentBuyer($request, $buyer);
 
         abort_unless($buyer->status === 'active', 422);
+
+        if (! AgentShopBuyerPolicy::canReceiveAgentWalletCredit($buyer)) {
+            return back()->withErrors([
+                'amount' => __('This buyer must pay with Paystack for orders. Wallet credits are no longer allowed.'),
+            ]);
+        }
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01', 'max:100000'],

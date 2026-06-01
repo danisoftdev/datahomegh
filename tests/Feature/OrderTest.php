@@ -344,7 +344,7 @@ class OrderTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         app(OrderService::class)->updateStatus(
             $order->id,
-            'REFUNDED',
+            'PROCESSING',
             $supplier->id,
             null,
             true,

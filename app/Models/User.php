@@ -60,6 +60,9 @@ class User extends Authenticatable
         'business_description',
         'status',
         'wallet_frozen',
+        'paystack_checkout_only',
+        'payout_method',
+        'payout_details',
         'daily_order_limit',
     ];
 
@@ -73,6 +76,8 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'wallet_frozen' => 'boolean',
+            'paystack_checkout_only' => 'boolean',
+            'payout_details' => 'array',
             'daily_order_limit' => 'integer',
             'deleted_at' => 'datetime',
         ];
@@ -121,6 +126,16 @@ class User extends Authenticatable
     public function resalePlans(): HasMany
     {
         return $this->hasMany(ResalePlan::class, 'agent_id');
+    }
+
+    public function agentEarningsBalance(): HasOne
+    {
+        return $this->hasOne(AgentEarningsBalance::class, 'agent_id');
+    }
+
+    public function agentWithdrawalRequests(): HasMany
+    {
+        return $this->hasMany(AgentWithdrawalRequest::class, 'agent_id');
     }
 
     public function scopeActive(Builder $query): Builder

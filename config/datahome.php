@@ -15,6 +15,12 @@ return [
     | geonet / encarta / iget product codes are fixed from config, not bundle labels.
     |
     */
+    'agent_shop' => [
+        'wallet_cutoff_ghs' => (float) env('AGENT_SHOP_WALLET_CUTOFF_GHS', 5),
+        'withdrawal_min_amount' => (float) env('AGENT_WITHDRAWAL_MIN_GHS', 10),
+        'withdrawal_fee_ghs' => (float) env('AGENT_WITHDRAWAL_FEE_GHS', 0),
+    ],
+
     'fulfillment' => [
         'providers' => [
             'iget' => [

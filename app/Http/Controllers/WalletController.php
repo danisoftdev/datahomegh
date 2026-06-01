@@ -6,6 +6,7 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Models\PaystackTransaction;
 use App\Models\User;
 use App\Models\WalletLedger;
+use App\Services\AgentShopCheckoutService;
 use App\Services\AgentShopRegistrationPaymentService;
 use App\Services\PaystackService;
 use App\Services\WalletService;
@@ -28,6 +29,7 @@ class WalletController extends Controller
         private readonly WalletService $walletService,
         private readonly PaystackService $paystackService,
         private readonly AgentShopRegistrationPaymentService $agentShopRegistrationPaymentService,
+        private readonly AgentShopCheckoutService $agentShopCheckoutService,
     ) {}
 
     public function index(Request $request): View
@@ -127,6 +129,13 @@ class WalletController extends Controller
             ]);
         }
 
+        if ($purpose === PaystackPaymentPurpose::AGENT_SHOP_ORDER) {
+            return redirect()->route('buyer.orders.paystack.callback', [
+                'reference' => $reference,
+                'trxref' => $reference,
+            ]);
+        }
+
         $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
         if ($userId <= 0) {
             return $this->paystackRedirectForUser($request)->withErrors(['paystack' => __('This payment could not be linked to an account.')]);
@@ -202,6 +211,14 @@ class WalletController extends Controller
                     return response()->json([], 200);
                 }
                 $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $data);
+            } elseif ($purpose === PaystackPaymentPurpose::AGENT_SHOP_ORDER) {
+                $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
+                if ($userId <= 0) {
+                    Log::warning('paystack_webhook_agent_shop_order_missing_user', ['reference' => $reference]);
+
+                    return response()->json([], 200);
+                }
+                $this->agentShopCheckoutService->completePaystackCheckout($userId, $reference, $amountGhs, $data);
             } elseif ($purpose === PaystackPaymentPurpose::WALLET_TOPUP) {
                 $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
                 if ($userId <= 0) {
