@@ -6,7 +6,9 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AgentShopCheckoutService;
 use App\Services\OrderService;
+use App\Support\AgentShopBuyerPolicy;
 use App\Support\AfaRegistrationPayload;
 use App\Support\BundleCatalog;
 use App\Support\OrderCartItemsValidator;
@@ -21,6 +23,7 @@ class BuyerOrderController extends Controller
 {
     public function __construct(
         private readonly OrderService $orderService,
+        private readonly AgentShopCheckoutService $agentShopCheckoutService,
     ) {}
 
     public function index(Request $request): View
@@ -65,6 +68,9 @@ class BuyerOrderController extends Controller
 
         $user->loadMissing('wallet');
         $walletBalance = $user->wallet !== null ? (string) $user->wallet->balance : '0.00';
+        $isAgentShopBuyer = AgentShopBuyerPolicy::isAgentShopBuyer($user);
+        $requiresPaystack = AgentShopBuyerPolicy::requiresPaystackCheckout($user);
+        $canUseWallet = AgentShopBuyerPolicy::canUseWalletCheckout($user);
 
         return view('buyer.orders.create', [
             'networks' => $networks,
@@ -76,6 +82,10 @@ class BuyerOrderController extends Controller
             ],
             'bundlesJson' => $bundlesJson,
             'walletBalance' => $walletBalance,
+            'isAgentShopBuyer' => $isAgentShopBuyer,
+            'requiresPaystack' => $requiresPaystack,
+            'canUseWallet' => $canUseWallet,
+            'walletCutoff' => AgentShopBuyerPolicy::walletCutoffGhs(),
         ]);
     }
 
@@ -124,6 +134,10 @@ class BuyerOrderController extends Controller
         }
 
         try {
+            if ($this->shouldPayWithPaystack($request->user(), $request)) {
+                return $this->redirectToPaystackCheckout($request->user(), [$payload]);
+            }
+
             $this->orderService->placeOrder($request->user()->id, $payload);
         } catch (InsufficientBalanceException $e) {
             return back()->withInput()->withErrors(['amount' => $e->getMessage()]);
@@ -148,6 +162,10 @@ class BuyerOrderController extends Controller
         $lines = $result['lines'];
 
         try {
+            if ($this->shouldPayWithPaystack($user, $request)) {
+                return $this->redirectToPaystackCheckout($user, $lines);
+            }
+
             $orders = $this->orderService->placeOrders($user->id, $lines);
         } catch (InsufficientBalanceException $e) {
             return back()->withInput()->withErrors(['amount' => $e->getMessage()]);
@@ -192,8 +210,81 @@ class BuyerOrderController extends Controller
 
         return redirect()->route('buyer.orders.show', $order->fresh())->with(
             'status',
-            __('Order cancelled. Your wallet was refunded automatically.')
+            $order->payment_method === 'paystack'
+                ? __('Order cancelled.')
+                : __('Order cancelled. Your wallet was refunded automatically.')
         );
+    }
+
+    public function paystackCallback(Request $request): RedirectResponse
+    {
+        $reference = (string) (
+            $request->query('reference')
+            ?? $request->query('trxref')
+            ?? ''
+        );
+
+        if ($reference === '') {
+            return redirect()->route('buyer.orders.create')->withErrors(['paystack' => __('Missing payment reference.')]);
+        }
+
+        $user = $request->user();
+        if ($user === null) {
+            return redirect()->route('login')->withErrors(['paystack' => __('Sign in to complete your order.')]);
+        }
+
+        try {
+            $verify = app(\App\Services\PaystackService::class)->verifyPayment($reference);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('buyer.orders.create')->withErrors(['paystack' => $e->getMessage()]);
+        }
+
+        if (strtolower((string) ($verify['status'] ?? '')) !== 'success') {
+            return redirect()->route('buyer.orders.create')->withErrors(['paystack' => __('Payment was not successful.')]);
+        }
+
+        $amountGhs = \App\Support\PaystackVerifyAmount::ghsFromVerifyData($verify);
+
+        try {
+            $this->agentShopCheckoutService->completePaystackCheckout((int) $user->id, $reference, $amountGhs, $verify);
+        } catch (\Throwable $e) {
+            return redirect()->route('buyer.orders.create')->withErrors(['paystack' => __('Could not place your order after payment. Contact support with reference :ref.', ['ref' => $reference])]);
+        }
+
+        return redirect()->route('buyer.orders.index')->with('status', __('Payment successful. Your order was placed.'));
+    }
+
+    /**
+     * @param  list<array{network: string, phone_number: string, bundle_package_id: int, afa_registration?: array<string, mixed>|null}>  $lines
+     */
+    private function redirectToPaystackCheckout(User $user, array $lines): RedirectResponse
+    {
+        try {
+            $init = $this->agentShopCheckoutService->initializePaystackCheckout($user, $lines);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['order' => $e->getMessage()]);
+        }
+
+        $request = request();
+        $request->session()->put('agent_shop_checkout', [
+            'reference' => $init['reference'],
+            'user_id' => $user->id,
+        ]);
+
+        return redirect()->away($init['authorization_url']);
+    }
+
+    private function shouldPayWithPaystack(User $user, Request $request): bool
+    {
+        if (! AgentShopBuyerPolicy::isAgentShopBuyer($user)) {
+            return false;
+        }
+
+        if (AgentShopBuyerPolicy::requiresPaystackCheckout($user)) {
+            return true;
+        }
+
+        return $request->input('payment_method') === 'paystack';
     }
 
     public function repeatLast(Request $request): JsonResponse

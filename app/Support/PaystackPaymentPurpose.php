@@ -8,6 +8,8 @@ final class PaystackPaymentPurpose
 {
     public const AGENT_SHOP_REGISTRATION = 'agent_shop_registration';
 
+    public const AGENT_SHOP_ORDER = 'agent_shop_order';
+
     public const WALLET_TOPUP = 'wallet_topup';
 
     public const UNKNOWN = 'unknown';
@@ -21,6 +23,9 @@ final class PaystackPaymentPurpose
         if ($storedKind === self::AGENT_SHOP_REGISTRATION) {
             return self::AGENT_SHOP_REGISTRATION;
         }
+        if ($storedKind === self::AGENT_SHOP_ORDER) {
+            return self::AGENT_SHOP_ORDER;
+        }
         if ($storedKind === self::WALLET_TOPUP) {
             return self::WALLET_TOPUP;
         }
@@ -28,6 +33,9 @@ final class PaystackPaymentPurpose
         $meta = PaystackChargeMetadata::fromChargeData($verifyData);
         if ($meta['type'] === self::AGENT_SHOP_REGISTRATION) {
             return self::AGENT_SHOP_REGISTRATION;
+        }
+        if ($meta['type'] === self::AGENT_SHOP_ORDER) {
+            return self::AGENT_SHOP_ORDER;
         }
         if ($meta['type'] === self::WALLET_TOPUP) {
             return self::WALLET_TOPUP;

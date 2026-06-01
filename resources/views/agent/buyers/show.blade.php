@@ -15,12 +15,16 @@
             <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $buyer->phone }}</dd></div>
             <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd>{{ $buyer->status }}</dd></div>
             <div><dt class="text-slate-500">{{ __('Wallet') }}</dt><dd>{{ $buyer->wallet ? number_format((float) $buyer->wallet->balance, 2).' GHS' : '—' }}</dd></div>
+            <div><dt class="text-slate-500">{{ __('Checkout') }}</dt><dd>{{ $buyer->paystack_checkout_only ? __('Paystack only') : __('Wallet allowed while balance > :cutoff GHS', ['cutoff' => number_format((float) config('datahome.agent_shop.wallet_cutoff_ghs', 5), 2)]) }}</dd></div>
         </dl>
 
         <div class="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
             @if ($buyer->status === 'active')
                 <div class="w-full rounded-lg border border-white/10 bg-[#1A1A2E]/80 p-4">
                     <h3 class="mb-2 text-sm font-medium text-emerald-300">{{ __('Credit buyer wallet') }}</h3>
+                    @if ($buyer->paystack_checkout_only)
+                        <p class="text-sm text-amber-200">{{ __('This buyer pays with Paystack only. Wallet credits are disabled.') }}</p>
+                    @else
                     <p class="mb-3 text-xs text-slate-400">{{ __('After you receive mobile money from this buyer (they should use their username as the reference), record the amount here.') }}</p>
                     <form method="post" action="{{ route('agent.buyers.wallet-credit', $buyer) }}" class="flex flex-wrap items-end gap-3">
                         @csrf
@@ -36,6 +40,7 @@
                         </div>
                         <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">{{ __('Credit wallet') }}</button>
                     </form>
+                    @endif
                 </div>
             @endif
             @if ($buyer->status === 'pending')

@@ -12,6 +12,7 @@ use App\Models\RolePrice;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Support\AfaRegistrationPayload;
+use App\Support\AgentShopBuyerPolicy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -25,6 +26,7 @@ class OrderService
         private readonly WalletService $walletService,
         private readonly NotificationService $notificationService,
         private readonly DataPackageFulfillmentService $dataPackageFulfillmentService,
+        private readonly AgentCommissionService $agentCommissionService,
     ) {}
 
     /**
@@ -39,9 +41,10 @@ class OrderService
      * Place multiple orders in one wallet checkout (one submit). Each line must include the recipient phone number.
      *
      * @param  list<array{network: string, phone_number: string, bundle_package_id: int, afa_registration?: array<string, mixed>|null}>  $lines
+     * @param  array{payment_method?: string, paystack_reference?: string|null, skip_wallet_debit?: bool}  $options
      * @return Collection<int, Order>
      */
-    public function placeOrders(int $userId, array $lines): Collection
+    public function placeOrders(int $userId, array $lines, array $options = []): Collection
     {
         if ($lines === []) {
             throw new InvalidArgumentException('Add at least one order line.');
@@ -51,7 +54,15 @@ class OrderService
             throw new InvalidArgumentException('Too many items in one checkout.');
         }
 
-        $orders = DB::transaction(function () use ($userId, $lines): Collection {
+        $paymentMethod = (string) ($options['payment_method'] ?? 'wallet');
+        $paystackReference = isset($options['paystack_reference']) ? (string) $options['paystack_reference'] : null;
+        $skipWalletDebit = (bool) ($options['skip_wallet_debit'] ?? false);
+
+        if ($paymentMethod === 'paystack' && ! $skipWalletDebit) {
+            throw new InvalidArgumentException('Paystack orders must skip wallet debit.');
+        }
+
+        $orders = DB::transaction(function () use ($userId, $lines, $paymentMethod, $paystackReference, $skipWalletDebit): Collection {
             /** @var User $user */
             $user = User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
 
@@ -67,6 +78,22 @@ class OrderService
 
             if ($wallet === null || $wallet->is_frozen) {
                 throw new InvalidArgumentException('Your wallet is not available or is frozen.');
+            }
+
+            if ($paymentMethod === 'wallet' && AgentShopBuyerPolicy::isAgentShopBuyer($user)) {
+                if (AgentShopBuyerPolicy::requiresPaystackCheckout($user)) {
+                    throw new InvalidArgumentException(__('Your account must pay with Paystack for each order.'));
+                }
+
+                if (! AgentShopBuyerPolicy::canUseWalletCheckout($user)) {
+                    throw new InvalidArgumentException(__('Your wallet balance is too low. Pay with Paystack for your next order.'));
+                }
+            }
+
+            if ($paymentMethod === 'wallet' && ! $skipWalletDebit) {
+                // wallet checkout continues below
+            } elseif ($paymentMethod !== 'paystack' || ! $skipWalletDebit) {
+                throw new InvalidArgumentException('Invalid checkout payment configuration.');
             }
 
             $limit = $user->daily_order_limit;
@@ -148,16 +175,22 @@ class OrderService
                 $price = $this->resolvePrice($user, $bundle);
                 $total = bcadd($total, $price, 2);
 
+                $commissionMeta = null;
+                if ($paymentMethod === 'paystack' && AgentShopBuyerPolicy::isAgentShopBuyer($user)) {
+                    $commissionMeta = $this->agentCommissionService->calculateForAgentShopOrder($user, $bundle, $price);
+                }
+
                 $prepared[] = [
                     'network' => $line['network'],
                     'phone_number' => $line['phone_number'],
                     'bundle' => $bundle,
                     'afa_registration' => $afaRegistration,
                     'price' => $price,
+                    'commission_meta' => $commissionMeta,
                 ];
             }
 
-            if (bccomp((string) $wallet->balance, $total, 2) < 0) {
+            if (! $skipWalletDebit && bccomp((string) $wallet->balance, $total, 2) < 0) {
                 throw InsufficientBalanceException::forAmount($total);
             }
 
@@ -175,16 +208,23 @@ class OrderService
                     'afa_registration' => $row['afa_registration'],
                     'bundle_package_id' => $bundle->id,
                     'amount' => $row['price'],
+                    'payment_method' => $paymentMethod,
+                    'paystack_reference' => $paystackReference,
+                    'agent_cost_amount' => $row['commission_meta']['cost'] ?? null,
+                    'agent_commission_amount' => $row['commission_meta']['commission'] ?? null,
+                    'agent_commission_status' => $row['commission_meta'] !== null ? 'pending' : null,
                     'status' => 'PENDING',
                 ]);
 
-                $this->walletService->debit(
-                    $userId,
-                    $row['price'],
-                    'ORDER',
-                    (string) $order->id,
-                    'Order #'.$order->id
-                );
+                if (! $skipWalletDebit) {
+                    $this->walletService->debit(
+                        $userId,
+                        $row['price'],
+                        'ORDER',
+                        (string) $order->id,
+                        'Order #'.$order->id
+                    );
+                }
 
                 $bundle->decrement('stock_count');
                 $bundle->refresh();
@@ -216,6 +256,12 @@ class OrderService
                 }
 
                 $orders->push($order->fresh(['bundlePackage', 'orderStatusHistories']));
+            }
+
+            if (! $skipWalletDebit && AgentShopBuyerPolicy::isAgentShopBuyer($user)) {
+                $user->refresh();
+                $user->load('wallet');
+                AgentShopBuyerPolicy::applyWalletCutoffIfNeeded($user);
             }
 
             return $orders;
@@ -274,22 +320,39 @@ class OrderService
 
             $old = $order->status;
 
-            if (in_array($old, ['SENT', 'REFUNDED'], true)) {
+            if ($old === 'REFUNDED') {
                 throw new InvalidArgumentException('Cannot change status from '.$old.'.');
             }
 
-            $this->assertStatusTransition($old, $newStatus);
+            if ($old === 'SENT' && $newStatus !== 'REFUNDED') {
+                throw new InvalidArgumentException('Cannot change status from '.$old.'.');
+            }
+
+            if ($old !== 'SENT') {
+                $this->assertStatusTransition($old, $newStatus);
+            }
 
             if ($newStatus === 'REFUNDED') {
-                $this->walletService->credit(
-                    $order->user_id,
-                    (string) $order->amount,
-                    'ORDER_REFUND',
-                    (string) $order->id,
-                    'Refund for order #'.$order->id
-                );
+                if ($order->payment_method !== 'paystack') {
+                    $this->walletService->credit(
+                        $order->user_id,
+                        (string) $order->amount,
+                        'ORDER_REFUND',
+                        (string) $order->id,
+                        'Refund for order #'.$order->id
+                    );
+                }
 
                 BundlePackage::query()->whereKey($order->bundle_package_id)->increment('stock_count');
+                $this->agentCommissionService->reverseCommission($order);
+            }
+
+            if ($newStatus === 'FAILED') {
+                $this->agentCommissionService->reverseCommission($order);
+            }
+
+            if ($newStatus === 'SENT') {
+                $this->agentCommissionService->creditOnSent($order);
             }
 
             $order->status = $newStatus;
@@ -387,6 +450,24 @@ class OrderService
     public function priceForBuyer(User $buyer, BundlePackage $bundle): string
     {
         return $this->resolvePrice($buyer, $bundle);
+    }
+
+    /**
+     * @param  list<array{network: string, phone_number: string, bundle_package_id: int, afa_registration?: array<string, mixed>|null}>  $lines
+     */
+    public function estimateCheckoutTotal(int $userId, array $lines): string
+    {
+        /** @var User $user */
+        $user = User::query()->whereKey($userId)->firstOrFail();
+
+        $total = '0.00';
+        foreach ($lines as $line) {
+            /** @var BundlePackage $bundle */
+            $bundle = BundlePackage::query()->whereKey((int) $line['bundle_package_id'])->firstOrFail();
+            $total = bcadd($total, $this->resolvePrice($user, $bundle), 2);
+        }
+
+        return $total;
     }
 
     private function resolvePrice(User $buyer, BundlePackage $bundle): string

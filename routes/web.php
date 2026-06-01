@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminAgentWithdrawalController;
 use App\Http\Controllers\Admin\AdminBundleController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminFulfillmentApiController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Agent\AgentBundleController;
 use App\Http\Controllers\Agent\AgentBuyerController;
 use App\Http\Controllers\Agent\AgentCheckoutController;
 use App\Http\Controllers\Agent\AgentController;
+use App\Http\Controllers\Agent\AgentEarningsController;
 use App\Http\Controllers\Agent\AgentOrderController;
 use App\Http\Controllers\Agent\AgentProfileController;
 use App\Http\Controllers\Agent\AgentResalePlanController;
@@ -112,6 +114,9 @@ Route::middleware('auth')->group(function (): void {
         Route::patch('bundles/{bundle}/availability', [AgentBundleController::class, 'toggleAvailability'])->name('bundles.availability');
 
         Route::resource('bundles.resale-plans', AgentResalePlanController::class)->except(['show']);
+
+        Route::get('earnings', [AgentEarningsController::class, 'index'])->name('earnings.index');
+        Route::post('earnings/withdraw', [AgentEarningsController::class, 'storeWithdrawal'])->name('earnings.withdraw');
     });
 
     Route::middleware('role:'.Role::SLUG_AGENT)->get('/agent/dashboard', fn () => redirect()->route('agent.dashboard'));
@@ -132,6 +137,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('orders/{order}', [BuyerOrderController::class, 'show'])->name('orders.show');
         Route::post('orders/{order}/cancel', [BuyerOrderController::class, 'cancel'])->name('orders.cancel');
     });
+
+    Route::middleware(['auth', 'role:'.Role::SLUG_BUYER])->match(['get', 'post'], 'buyer/orders/paystack/callback', [BuyerOrderController::class, 'paystackCallback'])
+        ->name('buyer.orders.paystack.callback');
 
     Route::middleware('role:'.Role::SLUG_BUYER)->get('/buyer/dashboard', fn () => redirect()->route('buyer.dashboard'));
 
@@ -196,6 +204,10 @@ Route::middleware('auth')->group(function (): void {
         Route::get('wallet', [AdminWalletController::class, 'index'])->name('wallet.index');
         Route::post('wallet/credit', [WalletController::class, 'adminCredit'])->name('wallet.credit');
         Route::post('wallet/debit', [WalletController::class, 'adminDebit'])->name('wallet.debit');
+
+        Route::get('withdrawals', [AdminAgentWithdrawalController::class, 'index'])->name('withdrawals.index');
+        Route::get('withdrawals/{withdrawal}', [AdminAgentWithdrawalController::class, 'show'])->name('withdrawals.show');
+        Route::patch('withdrawals/{withdrawal}/status', [AdminAgentWithdrawalController::class, 'updateStatus'])->name('withdrawals.status');
 
         Route::get('roles', [AdminRoleController::class, 'index'])->name('roles.index');
         Route::get('roles/create', [AdminRoleController::class, 'create'])->name('roles.create');
