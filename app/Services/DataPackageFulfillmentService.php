@@ -124,7 +124,7 @@ final class DataPackageFulfillmentService
     }
 
     /**
-     * Auto API: all agent and buyer data orders (including agent-shop buyers).
+     * Auto API: buyer/agent system roles and custom roles (e.g. dealer) with a checkout persona.
      */
     private function shouldAutoDispatchToProvider(Order $order): bool
     {
@@ -133,7 +133,18 @@ final class DataPackageFulfillmentService
             return false;
         }
 
-        return in_array($user->role?->slug, [Role::SLUG_AGENT, Role::SLUG_BUYER], true);
+        if ($user->isSupplier()) {
+            return false;
+        }
+
+        if ($user->isAgent() || $user->isBuyer()) {
+            return true;
+        }
+
+        $user->loadMissing('role');
+
+        return $user->role !== null
+            && ($user->role->usesAgentPersona() || $user->role->usesBuyerPersona());
     }
 
     /**
