@@ -182,6 +182,64 @@ class DataPackageFulfillmentTest extends TestCase
         $this->assertSame((string) $order->id, $order->provider_order_reference);
     }
 
+    public function test_promoted_dealer_role_with_agent_persona_dispatches_to_provider(): void
+    {
+        $supplier = $this->supplier();
+        $this->encartaProfile($supplier);
+
+        $dealerRole = Role::query()->create([
+            'name' => 'Dealer',
+            'slug' => 'dealer',
+            'is_enabled' => true,
+            'available_at_registration' => false,
+            'pricing_persona' => Role::PERSONA_AGENT,
+            'requires_promotion_fee' => false,
+        ]);
+
+        $dealer = User::factory()->create([
+            'role_id' => $dealerRole->id,
+            'status' => 'active',
+            'shop_slug' => 'dealer-shop',
+        ]);
+        Wallet::query()->create([
+            'user_id' => $dealer->id,
+            'balance' => '100.00',
+            'is_frozen' => false,
+        ]);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 2GB',
+            'size_label' => '2GB',
+            'internal_cost' => '8.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+        ]);
+
+        Config::set('datahome.fulfillment.providers.encarta.place_path', '/purchase');
+
+        $this->actingAs($dealer)->post(route('agent.orders.store'), [
+            'confirm' => true,
+            'items' => [
+                [
+                    'network' => 'MTN',
+                    'phone_number' => '0534620772',
+                    'bundle_package_id' => $bundle->id,
+                ],
+            ],
+        ])->assertRedirect();
+
+        $order = Order::query()->where('user_id', $dealer->id)->firstOrFail();
+        $this->assertSame('ENC-123', $order->provider_order_reference);
+        $this->assertNull($order->provider_dispatch_error);
+    }
+
     public function test_agent_linked_buyer_order_is_sent_to_external_api(): void
     {
         $supplier = $this->supplier();
