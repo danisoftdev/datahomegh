@@ -15,6 +15,8 @@ use App\Services\AgentCommissionService;
 use App\Services\OrderService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AgentShopCommissionTest extends TestCase
@@ -100,6 +102,45 @@ class AgentShopCommissionTest extends TestCase
         $order->refresh();
         $this->assertSame('reversed', $order->agent_commission_status);
         $this->assertSame('0.00', (string) AgentEarningsBalance::query()->where('agent_id', $agent->id)->value('balance'));
+    }
+
+    public function test_agent_shop_buyer_paystack_checkout_redirects_to_paystack(): void
+    {
+        Config::set('paystack.secret_key', 'sk_test_agent_shop');
+        Config::set('paystack.base_url', 'https://api.paystack.co');
+
+        [$agent, $buyer, $bundle] = $this->createAgentShopFixtures('12.00', '8.00');
+        $buyer->update(['paystack_checkout_only' => true]);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'message' => 'Authorization URL created',
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.com/test-agent-shop',
+                    'reference' => 'dhgh_test_ref',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'payment_method' => 'paystack',
+            'confirm' => true,
+            'items' => [
+                [
+                    'network' => 'MTN',
+                    'phone_number' => '0241234567',
+                    'bundle_package_id' => $bundle->id,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect('https://checkout.paystack.com/test-agent-shop');
+        $this->assertDatabaseHas('paystack_transactions', [
+            'user_id' => $buyer->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('orders', ['user_id' => $buyer->id]);
     }
 
     public function test_wallet_cutoff_switches_buyer_to_paystack_only(): void

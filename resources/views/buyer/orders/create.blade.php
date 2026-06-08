@@ -20,7 +20,7 @@
                 requiresPaystack: @json($requiresPaystack),
                 canUseWallet: @json($canUseWallet),
                 walletCutoff: {{ json_encode((float) $walletCutoff) }},
-                paymentMethod: 'wallet',
+                paymentMethod: @json($requiresPaystack ? 'paystack' : 'wallet'),
                 rows: [],
                 confirm: false,
                 submitting: false,
@@ -129,10 +129,22 @@
                     return this.rows.length > 0 && this.rows.every((r) => this.rowValid(r));
                 },
                 canSubmitWallet() {
-                    return this.confirm && this.canPayWithWallet() && this.allRowsValid() && !this.submitting;
+                    return this.confirm && this.canPayWithWallet() && this.allRowsValid();
                 },
                 canSubmitPaystack() {
-                    return this.confirm && this.canPayWithPaystack() && !this.submitting;
+                    return this.confirm && this.canPayWithPaystack();
+                },
+                onFormSubmit(event) {
+                    if (this.paymentMethod === 'paystack') {
+                        if (!this.canSubmitPaystack()) {
+                            event.preventDefault();
+                            return;
+                        }
+                    } else if (!this.canSubmitWallet()) {
+                        event.preventDefault();
+                        return;
+                    }
+                    this.submitting = true;
                 },
             }"
             x-init="init()"
@@ -147,7 +159,7 @@
                 </div>
             @endif
 
-            <form method="post" action="{{ route('buyer.orders.store') }}" class="space-y-8">
+            <form method="post" action="{{ route('buyer.orders.store') }}" class="space-y-8" @submit="onFormSubmit($event)">
                 @csrf
                 <input type="hidden" name="payment_method" :value="paymentMethod" />
 
@@ -284,17 +296,17 @@
                         <span class="text-sm text-slate-300">{{ __('I confirm these orders. Charges apply for the full total immediately. Each recipient number is correct for its bundle.') }}</span>
                     </label>
 
-                    <button type="submit" x-show="!requiresPaystack && canUseWallet" @click="paymentMethod = 'wallet'; if (!canSubmitWallet()) { $event.preventDefault(); } else { submitting = true; }" :disabled="!canSubmitWallet()" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-6 py-3 text-sm font-bold text-[#1A1A2E] disabled:opacity-40">
+                    <button type="submit" x-show="!requiresPaystack && canUseWallet" @click="paymentMethod = 'wallet'" :disabled="!canSubmitWallet() || submitting" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-6 py-3 text-sm font-bold text-[#1A1A2E] disabled:opacity-40">
                         <svg x-show="submitting && paymentMethod === 'wallet'" class="size-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span x-text="submitting && paymentMethod === 'wallet' ? '{{ __('Placing…') }}' : (rows.length > 1 ? '{{ __('Pay from wallet') }}' : '{{ __('Place order from wallet') }}')"></span>
                     </button>
 
-                    <button type="submit" x-show="isAgentShopBuyer" @click="paymentMethod = 'paystack'; if (!canSubmitPaystack()) { $event.preventDefault(); } else { submitting = true; }" :disabled="!canSubmitPaystack()" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg border border-[#FFD700] bg-transparent px-6 py-3 text-sm font-bold text-[#FFD700] disabled:opacity-40">
+                    <button type="submit" x-show="isAgentShopBuyer" @click="paymentMethod = 'paystack'" :disabled="!canSubmitPaystack() || submitting" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg border border-[#FFD700] bg-transparent px-6 py-3 text-sm font-bold text-[#FFD700] disabled:opacity-40">
                         <svg x-show="submitting && paymentMethod === 'paystack'" class="size-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span x-text="submitting && paymentMethod === 'paystack' ? '{{ __('Redirecting…') }}' : '{{ __('Pay with Paystack') }}'"></span>
                     </button>
 
-                    <button type="submit" x-show="!isAgentShopBuyer" @click="paymentMethod = 'wallet'; if (!canSubmitWallet()) { $event.preventDefault(); } else { submitting = true; }" :disabled="!canSubmitWallet()" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-6 py-3 text-sm font-bold text-[#1A1A2E] disabled:opacity-40">
+                    <button type="submit" x-show="!isAgentShopBuyer" @click="paymentMethod = 'wallet'" :disabled="!canSubmitWallet() || submitting" class="inline-flex min-w-48 items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-6 py-3 text-sm font-bold text-[#1A1A2E] disabled:opacity-40">
                         <svg x-show="submitting" class="size-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <span x-text="submitting ? '{{ __('Placing…') }}' : (rows.length > 1 ? '{{ __('Pay & place all') }}' : '{{ __('Place order') }}')"></span>
                     </button>
