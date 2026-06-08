@@ -42,7 +42,9 @@ class PaystackService
             $options['metadata'] ?? [],
         );
 
-        $response = Http::withToken($this->secretKey)
+        $response = Http::timeout(30)
+            ->connectTimeout(10)
+            ->withToken($this->secretKey)
             ->acceptJson()
             ->asJson()
             ->post("{$this->baseUrl}/transaction/initialize", [

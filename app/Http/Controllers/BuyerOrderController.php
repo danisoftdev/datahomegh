@@ -271,7 +271,14 @@ class BuyerOrderController extends Controller
             'user_id' => $user->id,
         ]);
 
-        return redirect()->away($init['authorization_url']);
+        $authorizationUrl = trim((string) ($init['authorization_url'] ?? ''));
+        if ($authorizationUrl === '') {
+            return back()->withInput()->withErrors([
+                'order' => __('Paystack did not return a payment page. Please try again or contact support.'),
+            ]);
+        }
+
+        return redirect()->away($authorizationUrl);
     }
 
     private function shouldPayWithPaystack(User $user, Request $request): bool
