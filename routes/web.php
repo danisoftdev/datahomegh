@@ -33,7 +33,22 @@ use App\Models\Role;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (auth()->check()) {
+        $user = auth()->user()->loadMissing('role');
+        $role = $user->role?->slug;
+
+        if ($role === Role::SLUG_SUPPLIER) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        if ($role === Role::SLUG_AGENT || $user->canAccessAgentArea()) {
+            return redirect()->route('agent.dashboard');
+        }
+
+        return redirect()->route('buyer.dashboard');
+    }
+
+    return redirect()->route('login');
 });
 
 Route::get('/pending-approval', [AuthController::class, 'pendingApproval'])
