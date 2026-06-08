@@ -104,6 +104,19 @@ class AgentShopCommissionTest extends TestCase
         $this->assertSame('0.00', (string) AgentEarningsBalance::query()->where('agent_id', $agent->id)->value('balance'));
     }
 
+    public function test_agent_shop_buyer_checkout_page_renders_cart_not_raw_javascript(): void
+    {
+        [$agent, $buyer] = $this->createAgentShopFixtures('12.00', '8.00');
+        $buyer->update(['paystack_checkout_only' => true]);
+
+        $response = $this->actingAs($buyer)->get(route('buyer.orders.create'));
+
+        $response->assertOk();
+        $response->assertSee('Pay with Paystack', false);
+        $response->assertSee("paymentMethod: 'paystack'", false);
+        $response->assertDontSee('0) { this.rows = oldItems.map', false);
+    }
+
     public function test_agent_shop_buyer_paystack_checkout_redirects_to_paystack(): void
     {
         Config::set('paystack.secret_key', 'sk_test_agent_shop');

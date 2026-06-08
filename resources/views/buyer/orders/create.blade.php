@@ -20,7 +20,7 @@
                 requiresPaystack: @json($requiresPaystack),
                 canUseWallet: @json($canUseWallet),
                 walletCutoff: {{ json_encode((float) $walletCutoff) }},
-                paymentMethod: @json($requiresPaystack ? 'paystack' : 'wallet'),
+                paymentMethod: '{{ $requiresPaystack ? 'paystack' : 'wallet' }}',
                 rows: [],
                 confirm: false,
                 submitting: false,
