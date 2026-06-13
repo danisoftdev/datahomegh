@@ -52,12 +52,14 @@
                         <td class="px-4 py-3"><span class="{{ $order->status_color }}">{{ $order->status }}</span></td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             <a href="{{ route('buyer.orders.show', $order) }}" class="text-[#FFD700] hover:underline">{{ __('View') }}</a>
+                            {{-- Buyer self-cancel disabled — uncomment to restore cancel on pending orders.
                             @if ($order->status === 'PENDING')
                                 <form method="post" action="{{ route('buyer.orders.cancel', $order) }}" class="inline" onsubmit="return confirm(@json(__('Cancel and refund wallet?')))">
                                     @csrf
                                     <button type="submit" class="ml-3 text-xs text-red-400 hover:underline">{{ __('Cancel') }}</button>
                                 </form>
                             @endif
+                            --}}
                         </td>
                     </tr>
                 @empty

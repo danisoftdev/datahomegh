@@ -76,12 +76,14 @@
                             <td class="px-3 py-2">{{ number_format((float) $o->amount, 2) }}</td>
                             <td class="px-3 py-2 whitespace-nowrap text-right">
                                 <a href="{{ route('agent.orders.show', $o) }}" class="text-emerald-400 hover:underline">{{ __('View') }}</a>
+                                {{-- Agent self-cancel disabled — uncomment to restore cancel on own pending orders.
                                 @if ((int) $o->user_id === (int) auth()->id() && $o->status === 'PENDING')
                                     <form method="post" action="{{ route('agent.orders.cancel', $o) }}" class="inline" onsubmit="return confirm(@json(__('Cancel and refund wallet?')))">
                                         @csrf
                                         <button type="submit" class="ml-2 text-xs text-red-400 hover:underline">{{ __('Cancel') }}</button>
                                     </form>
                                 @endif
+                                --}}
                             </td>
                         </tr>
                     @endforeach

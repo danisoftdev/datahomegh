@@ -34,6 +34,7 @@
                 </div>
             </dl>
             @include('orders.partials.afa-registration', ['order' => $order])
+            {{-- Buyer self-cancel disabled — uncomment block below and restore buyer.orders.cancel route.
             @error('cancel')
                 <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{{ $message }}</p>
             @enderror
@@ -46,6 +47,7 @@
                     </form>
                 </div>
             @endif
+            --}}
         </div>
 
         <div class="rounded-2xl border border-white/10 bg-[#16213E]/80 p-6 shadow-xl sm:p-8">

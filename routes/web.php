@@ -114,7 +114,8 @@ Route::middleware('auth')->group(function (): void {
         });
         Route::post('orders/bulk-update', [AgentOrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
         Route::get('orders/{order}', [AgentOrderController::class, 'show'])->name('orders.show');
-        Route::post('orders/{order}/cancel', [AgentOrderController::class, 'cancelPurchaserOwn'])->name('orders.cancel');
+        // Buyer/agent self-cancel disabled — restore route to re-enable purchaser cancellation.
+        // Route::post('orders/{order}/cancel', [AgentOrderController::class, 'cancelPurchaserOwn'])->name('orders.cancel');
         Route::patch('orders/{order}/status', [AgentOrderController::class, 'updateStatus'])->name('orders.status');
         Route::post('orders/{order}/notes', [AgentOrderController::class, 'addNote'])->name('orders.notes');
 
@@ -150,7 +151,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('orders/create', [BuyerOrderController::class, 'create'])->name('orders.create');
         Route::post('orders', [BuyerOrderController::class, 'store'])->name('orders.store');
         Route::get('orders/{order}', [BuyerOrderController::class, 'show'])->name('orders.show');
-        Route::post('orders/{order}/cancel', [BuyerOrderController::class, 'cancel'])->name('orders.cancel');
+        // Buyer/agent self-cancel disabled — restore route to re-enable purchaser cancellation.
+        // Route::post('orders/{order}/cancel', [BuyerOrderController::class, 'cancel'])->name('orders.cancel');
     });
 
     Route::middleware(['auth', 'role:'.Role::SLUG_BUYER])->match(['get', 'post'], 'buyer/orders/paystack/callback', [BuyerOrderController::class, 'paystackCallback'])

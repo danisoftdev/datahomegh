@@ -38,12 +38,7 @@ class AgentCommissionService
 
     public function resolveAgentListPrice(BundlePackage $agentBundle): string
     {
-        $platformBundle = BundlePackage::query()
-            ->whereNull('agent_id')
-            ->where('network', $agentBundle->network)
-            ->where('size_label', $agentBundle->size_label)
-            ->where('package_kind', $agentBundle->package_kind ?? 'data')
-            ->first();
+        $platformBundle = $this->findMatchingPlatformBundle($agentBundle);
 
         if ($platformBundle === null) {
             return bcadd((string) $agentBundle->internal_cost, '0', 2);
@@ -64,9 +59,51 @@ class AgentCommissionService
         return bcadd((string) $platformBundle->internal_cost, '0', 2);
     }
 
+    private function findMatchingPlatformBundle(BundlePackage $agentBundle): ?BundlePackage
+    {
+        $packageKind = $agentBundle->package_kind ?? 'data';
+        $normalizedAgentSize = $this->normalizedSizeLabel($agentBundle->size_label);
+
+        $candidates = BundlePackage::query()
+            ->whereNull('agent_id')
+            ->where('network', $agentBundle->network)
+            ->where('package_kind', $packageKind)
+            ->get();
+
+        foreach ($candidates as $platformBundle) {
+            if ($this->normalizedSizeLabel($platformBundle->size_label) === $normalizedAgentSize) {
+                return $platformBundle;
+            }
+        }
+
+        if ($normalizedAgentSize !== '') {
+            foreach ($candidates as $platformBundle) {
+                $normalizedName = $this->normalizedSizeLabel($platformBundle->name);
+                if ($normalizedName !== '' && str_contains($normalizedName, $normalizedAgentSize)) {
+                    return $platformBundle;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizedSizeLabel(?string $label): string
+    {
+        if ($label === null || trim($label) === '') {
+            return '';
+        }
+
+        return strtolower(preg_replace('/\s+/', '', trim($label)) ?? '');
+    }
+
     public function creditOnSent(Order $order): void
     {
-        if (! $this->isCommissionEligible($order)) {
+        if ($order->payment_method !== 'paystack' || $order->agent_id === null) {
+            return;
+        }
+
+        if ((int) $order->user_id === (int) $order->agent_id) {
             return;
         }
 
@@ -75,6 +112,13 @@ class AgentCommissionService
         }
 
         $commission = bcadd((string) $order->agent_commission_amount, '0', 2);
+        if (bccomp($commission, '0', 2) <= 0) {
+            $recalculated = $this->tryRecalculateCommission($order);
+            if ($recalculated !== null) {
+                $commission = $recalculated;
+            }
+        }
+
         if (bccomp($commission, '0', 2) <= 0) {
             $order->agent_commission_status = 'credited';
             $order->save();
@@ -239,20 +283,31 @@ class AgentCommissionService
         });
     }
 
-    private function isCommissionEligible(Order $order): bool
+    private function tryRecalculateCommission(Order $order): ?string
     {
-        if ($order->payment_method !== 'paystack') {
-            return false;
+        $order->loadMissing(['bundlePackage', 'user']);
+        $buyer = $order->user;
+        $bundle = $order->bundlePackage;
+
+        if ($buyer === null || $bundle === null || $bundle->agent_id === null) {
+            return null;
         }
 
-        if ($order->agent_id === null) {
-            return false;
+        try {
+            $meta = $this->calculateForAgentShopOrder($buyer, $bundle, (string) $order->amount);
+        } catch (InvalidArgumentException) {
+            return null;
         }
 
-        if ((int) $order->user_id === (int) $order->agent_id) {
-            return false;
+        $commission = bcadd($meta['commission'], '0', 2);
+        if (bccomp($commission, '0', 2) <= 0) {
+            return null;
         }
 
-        return bccomp((string) ($order->agent_commission_amount ?? '0'), '0', 2) > 0;
+        $order->agent_cost_amount = $meta['cost'];
+        $order->agent_commission_amount = $commission;
+        $order->save();
+
+        return $commission;
     }
 }

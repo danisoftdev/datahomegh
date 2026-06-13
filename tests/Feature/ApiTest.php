@@ -102,6 +102,7 @@ class ApiTest extends TestCase
 
     public function test_api_buyer_can_cancel_pending_order(): void
     {
+        $this->markTestSkipped('Buyer self-cancel disabled in API routes.');
         $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
         $buyer = User::factory()->create([
             'role_id' => $buyerRole->id,
