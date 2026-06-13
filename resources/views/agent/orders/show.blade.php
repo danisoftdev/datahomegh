@@ -25,6 +25,7 @@
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}</dd></div>
             </dl>
             @include('orders.partials.afa-registration', ['order' => $order])
+            {{-- Agent self-cancel disabled — uncomment block below and restore agent.orders.cancel route.
             @error('cancel')
                 <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{{ $message }}</p>
             @enderror
@@ -37,6 +38,7 @@
                     </form>
                 </div>
             @endif
+            --}}
         </div>
 
         <div class="space-y-4">

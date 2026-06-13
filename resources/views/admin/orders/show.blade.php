@@ -13,6 +13,17 @@
             <dl class="grid gap-3 text-sm sm:grid-cols-2">
                 <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd class="font-medium text-white">{{ $order->status }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Amount') }}</dt><dd class="text-[#FFD700]">{{ number_format((float) $order->amount, 2) }} GHS</dd></div>
+                <div><dt class="text-slate-500">{{ __('Payment') }}</dt><dd class="text-white">{{ strtoupper((string) ($order->payment_method ?? 'wallet')) }}</dd></div>
+                @if ($order->payment_method === 'paystack' && $order->agent_id)
+                    <div><dt class="text-slate-500">{{ __('Agent commission') }}</dt>
+                        <dd class="text-white">
+                            {{ number_format((float) ($order->agent_commission_amount ?? 0), 2) }} GHS
+                            @if ($order->agent_commission_status)
+                                <span class="text-xs text-slate-500">({{ $order->agent_commission_status }})</span>
+                            @endif
+                        </dd>
+                    </div>
+                @endif
                 <div><dt class="text-slate-500">{{ __('Network') }}</dt><dd>{{ $order->bundlePackage?->isMtnAfaRegistration() ? __('MTN AFA') : $order->network }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Phone') }}</dt><dd>{{ $order->phone_number }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Buyer') }}</dt><dd>{{ $order->user?->username }} (#{{ $order->user_id }})</dd></div>
@@ -39,6 +50,7 @@
                         <dd class="mt-1 space-y-1 text-sm">
                             @if ($order->provider_dispatch_error)
                                 <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">{{ $order->provider_dispatch_error }}</p>
+                                <p class="text-xs text-slate-500">{{ __('Provider errors do not cancel the order. Fulfill manually if needed, then mark SENT.') }}</p>
                             @endif
                             @if ($order->provider_order_reference)
                                 <p><span class="text-slate-500">{{ __('Reference') }}:</span> <span class="font-mono text-white">{{ $order->provider_order_reference }}</span></p>

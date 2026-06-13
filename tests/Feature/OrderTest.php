@@ -221,6 +221,7 @@ class OrderTest extends TestCase
 
     public function test_buyer_can_cancel_pending_order_refunds_wallet_restocks(): void
     {
+        $this->markTestSkipped('Buyer self-cancel disabled in UI and routes.');
         $bundle = $this->createPlatformBundle();
         $beforeStock = $bundle->stock_count;
         $buyer = $this->activeBuyerWithWallet('100.00');
@@ -247,6 +248,7 @@ class OrderTest extends TestCase
 
     public function test_buyer_cannot_cancel_after_processing(): void
     {
+        $this->markTestSkipped('Buyer self-cancel disabled in UI and routes.');
         $bundle = $this->createPlatformBundle();
         $buyer = $this->activeBuyerWithWallet('100.00');
         $supplier = $this->supplierUser();
@@ -271,6 +273,7 @@ class OrderTest extends TestCase
 
     public function test_agent_can_cancel_own_pending_checkout_refunds_wallet(): void
     {
+        $this->markTestSkipped('Agent self-cancel disabled in UI and routes.');
         $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
         $agent = User::factory()->create([
             'role_id' => $agentRole->id,

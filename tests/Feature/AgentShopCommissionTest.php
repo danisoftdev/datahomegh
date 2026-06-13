@@ -69,6 +69,7 @@ class AgentShopCommissionTest extends TestCase
         $this->assertSame('10.00', bcadd((string) $order->agent_cost_amount, '0', 2));
         $this->assertSame('5.00', bcadd((string) $order->agent_commission_amount, '0', 2));
         $this->assertSame('pending', $order->agent_commission_status);
+        $this->assertNull(AgentEarningsBalance::query()->where('agent_id', $agent->id)->first());
 
         app(OrderService::class)->updateStatus($order->id, 'PROCESSING', $agent->id, null, false);
         app(OrderService::class)->updateStatus($order->id, 'SENT', $agent->id, null, false);
@@ -233,6 +234,78 @@ class AgentShopCommissionTest extends TestCase
 
         $price = app(AgentCommissionService::class)->resolveAgentListPrice($bundle);
         $this->assertSame('10.00', $price);
+    }
+
+    public function test_paystack_order_recalculates_zero_commission_on_sent(): void
+    {
+        [$agent, $buyer, $bundle] = $this->createAgentShopFixtures('15.00', '10.00');
+
+        $order = Order::query()->create([
+            'user_id' => $buyer->id,
+            'agent_id' => $agent->id,
+            'network' => 'MTN',
+            'phone_number' => '0241234567',
+            'bundle_package_id' => $bundle->id,
+            'amount' => '15.00',
+            'payment_method' => 'paystack',
+            'paystack_reference' => 'ps_ref_zero_commission',
+            'agent_cost_amount' => '15.00',
+            'agent_commission_amount' => '0.00',
+            'agent_commission_status' => 'pending',
+            'status' => 'PROCESSING',
+        ]);
+
+        app(OrderService::class)->updateStatus($order->id, 'SENT', $agent->id, null, false);
+
+        $order->refresh();
+        $this->assertSame('credited', $order->agent_commission_status);
+        $this->assertSame('5.00', bcadd((string) $order->agent_commission_amount, '0', 2));
+
+        $balance = AgentEarningsBalance::query()->where('agent_id', $agent->id)->firstOrFail();
+        $this->assertSame('5.00', (string) $balance->balance);
+    }
+
+    public function test_resolve_agent_list_price_matches_platform_bundle_with_spaced_size_label(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_slug' => 'shop-'.uniqid(),
+        ]);
+
+        $platformBundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Platform MTN 2GB',
+            'size_label' => '2 GB',
+            'internal_cost' => '7.00',
+            'stock_count' => 100,
+            'is_available' => true,
+        ]);
+
+        RolePrice::query()->create([
+            'role_id' => $agentRole->id,
+            'bundle_package_id' => $platformBundle->id,
+            'price' => '8.50',
+        ]);
+
+        $agentBundle = BundlePackage::query()->create([
+            'agent_id' => $agent->id,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN',
+            'size_label' => '2GB',
+            'internal_cost' => '12.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $price = app(AgentCommissionService::class)->resolveAgentListPrice($agentBundle);
+        $this->assertSame('8.50', $price);
     }
 
     /**
