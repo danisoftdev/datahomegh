@@ -98,7 +98,8 @@ class AgentShopCommissionTest extends TestCase
         app(OrderService::class)->updateStatus($order->id, 'PROCESSING', $agent->id, null, false);
         app(OrderService::class)->updateStatus($order->id, 'SENT', $agent->id, null, false);
 
-        app(OrderService::class)->updateStatus($order->id, 'REFUNDED', $agent->id, 'test refund', false);
+        $supplier = $this->supplierUser();
+        app(OrderService::class)->updateStatus($order->id, 'REFUNDED', $supplier->id, 'test refund', false);
 
         $order->refresh();
         $this->assertSame('reversed', $order->agent_commission_status);

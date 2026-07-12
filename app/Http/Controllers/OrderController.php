@@ -42,8 +42,13 @@ class OrderController extends Controller
     {
         $this->authorizeStaffOrder($request->user(), $order);
 
+        $isSupplier = $request->user()->isSupplier();
+        $allowedStatuses = $isSupplier
+            ? ['PROCESSING', 'SENT', 'FAILED', 'REFUNDED']
+            : ['PROCESSING', 'SENT', 'FAILED'];
+
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['PROCESSING', 'SENT', 'FAILED', 'REFUNDED'])],
+            'status' => ['required', Rule::in($allowedStatuses)],
             'note' => ['nullable', 'string', 'max:2000'],
             'visible_to_buyer' => ['sometimes', 'boolean'],
         ]);
@@ -72,10 +77,15 @@ class OrderController extends Controller
 
         $request->merge(['order_ids' => $filtered]);
 
+        $isSupplier = $request->user()->isSupplier();
+        $allowedStatuses = $isSupplier
+            ? ['PROCESSING', 'SENT', 'FAILED', 'REFUNDED']
+            : ['PROCESSING', 'SENT', 'FAILED'];
+
         $validated = $request->validate([
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['integer', 'exists:orders,id'],
-            'status' => ['required', Rule::in(['PROCESSING', 'SENT', 'FAILED', 'REFUNDED'])],
+            'status' => ['required', Rule::in($allowedStatuses)],
             'note' => ['nullable', 'string', 'max:2000'],
             'visible_to_buyer' => ['sometimes', 'boolean'],
         ]);

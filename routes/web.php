@@ -114,8 +114,6 @@ Route::middleware('auth')->group(function (): void {
         });
         Route::post('orders/bulk-update', [AgentOrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
         Route::get('orders/{order}', [AgentOrderController::class, 'show'])->name('orders.show');
-        // Buyer/agent self-cancel disabled — restore route to re-enable purchaser cancellation.
-        // Route::post('orders/{order}/cancel', [AgentOrderController::class, 'cancelPurchaserOwn'])->name('orders.cancel');
         Route::patch('orders/{order}/status', [AgentOrderController::class, 'updateStatus'])->name('orders.status');
         Route::post('orders/{order}/notes', [AgentOrderController::class, 'addNote'])->name('orders.notes');
 

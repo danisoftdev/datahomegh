@@ -271,9 +271,58 @@ class OrderTest extends TestCase
             ->assertSessionHasErrors('cancel');
     }
 
+    public function test_agent_cannot_refund_orders(): void
+    {
+        $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+
+        $agent = User::factory()->create([
+            'role_id' => $agentRole->id,
+            'status' => 'active',
+            'shop_slug' => 'agent-no-refund',
+        ]);
+
+        $buyer = User::factory()->forAgent($agent)->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '100.00',
+            'is_frozen' => false,
+        ]);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => $agent->id,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'Agent Buyer Bundle',
+            'size_label' => '1GB',
+            'internal_cost' => '4.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ])->assertRedirect();
+
+        $order = Order::query()->where('user_id', $buyer->id)->firstOrFail();
+
+        $this->actingAs($agent)->patch(route('agent.orders.status', $order), [
+            'status' => 'REFUNDED',
+        ])->assertSessionHasErrors('status');
+
+        $this->assertSame('PENDING', $order->fresh()->status);
+    }
+
     public function test_agent_can_cancel_own_pending_checkout_refunds_wallet(): void
     {
-        $this->markTestSkipped('Agent self-cancel disabled in UI and routes.');
+        $this->markTestSkipped('Agent refunds and self-cancel are permanently disabled.');
         $agentRole = Role::query()->where('slug', Role::SLUG_AGENT)->firstOrFail();
         $agent = User::factory()->create([
             'role_id' => $agentRole->id,
