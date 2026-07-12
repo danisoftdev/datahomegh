@@ -54,7 +54,9 @@
                             <option value="PROCESSING">PROCESSING</option>
                             <option value="SENT">SENT</option>
                             <option value="FAILED">FAILED</option>
-                            <option value="REFUNDED">REFUNDED</option>
+                            @if (auth()->user()->isSupplier())
+                                <option value="REFUNDED">REFUNDED</option>
+                            @endif
                         </select>
                     </div>
                     <div>

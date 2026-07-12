@@ -14,6 +14,8 @@ use InvalidArgumentException;
 
 class AgentOrderController extends Controller
 {
+    private const AGENT_ORDER_STATUSES = ['PROCESSING', 'SENT', 'FAILED'];
+
     public function __construct(
         private readonly OrderService $orderService,
     ) {}
@@ -61,7 +63,7 @@ class AgentOrderController extends Controller
         $this->assertAgentOrder($request, $order);
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['PROCESSING', 'SENT', 'FAILED', 'REFUNDED'])],
+            'status' => ['required', Rule::in(self::AGENT_ORDER_STATUSES)],
             'note' => ['nullable', 'string', 'max:2000'],
             'visible_to_buyer' => ['sometimes', 'boolean'],
         ]);
@@ -93,7 +95,7 @@ class AgentOrderController extends Controller
         $validated = $request->validate([
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['integer', 'exists:orders,id'],
-            'status' => ['required', Rule::in(['PROCESSING', 'SENT', 'FAILED', 'REFUNDED'])],
+            'status' => ['required', Rule::in(self::AGENT_ORDER_STATUSES)],
             'note' => ['nullable', 'string', 'max:2000'],
             'visible_to_buyer' => ['sometimes', 'boolean'],
         ]);
@@ -137,24 +139,6 @@ class AgentOrderController extends Controller
         );
 
         return back()->with('status', __('Note added.'));
-    }
-
-    /**
-     * Agent cancels their own catalogue purchase (order.user_id = agent), not buyer-linked orders under their shop.
-     */
-    public function cancelPurchaserOwn(Request $request, Order $order): RedirectResponse
-    {
-        $this->assertAgentOrder($request, $order);
-
-        abort_unless((int) $order->user_id === (int) $request->user()->id, 403);
-
-        try {
-            $this->orderService->cancelPendingOrderByPurchaser($request->user(), $order->fresh());
-        } catch (InvalidArgumentException $e) {
-            return back()->withErrors(['cancel' => $e->getMessage()]);
-        }
-
-        return back()->with('status', __('Order cancelled. Your wallet was refunded automatically.'));
     }
 
     private function assertAgentOrder(Request $request, Order $order): void

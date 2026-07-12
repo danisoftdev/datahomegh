@@ -25,20 +25,6 @@
                 <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('Bundle') }}</dt><dd>{{ $order->bundlePackage?->name }} — {{ $order->bundlePackage?->size_label }}</dd></div>
             </dl>
             @include('orders.partials.afa-registration', ['order' => $order])
-            {{-- Agent self-cancel disabled — uncomment block below and restore agent.orders.cancel route.
-            @error('cancel')
-                <p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{{ $message }}</p>
-            @enderror
-            @if ((int) $order->user_id === (int) auth()->id() && $order->status === 'PENDING')
-                <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 lg:col-span-2">
-                    <p class="text-sm text-slate-300">{{ __('This is your wallet purchase — cancel anytime while still pending (before processing starts). Funds return to your wallet.') }}</p>
-                    <form method="post" action="{{ route('agent.orders.cancel', $order) }}" class="mt-4" onsubmit="return confirm(@json(__('Cancel this order and refund your wallet?')))">
-                        @csrf
-                        <button type="submit" class="rounded-lg border border-red-400/60 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-500/10">{{ __('Cancel order & refund wallet') }}</button>
-                    </form>
-                </div>
-            @endif
-            --}}
         </div>
 
         <div class="space-y-4">
@@ -51,7 +37,6 @@
                         <option value="PROCESSING">PROCESSING</option>
                         <option value="SENT">SENT</option>
                         <option value="FAILED">FAILED</option>
-                        <option value="REFUNDED">REFUNDED</option>
                     </select>
                     <textarea name="note" rows="2" placeholder="{{ __('Note') }}" class="mb-2 w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-sm text-white"></textarea>
                     <input type="hidden" name="visible_to_buyer" value="0" />

@@ -281,8 +281,12 @@ class OrderService
      */
     public function cancelPendingOrderByPurchaser(User $actor, Order $order): Order
     {
-        if (! in_array($actor->role?->slug, [Role::SLUG_BUYER, Role::SLUG_AGENT], true)) {
-            throw new InvalidArgumentException('Only buyers and agents can cancel purchases this way.');
+        if ($actor->canAccessAgentArea()) {
+            throw new InvalidArgumentException(__('Agents cannot cancel or refund orders.'));
+        }
+
+        if ($actor->role?->slug !== Role::SLUG_BUYER) {
+            throw new InvalidArgumentException('Only buyers can cancel purchases this way.');
         }
 
         if ((int) $order->user_id !== (int) $actor->id) {
@@ -319,6 +323,13 @@ class OrderService
             $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
 
             $old = $order->status;
+
+            if ($newStatus === 'REFUNDED') {
+                $changer = User::query()->whereKey($changedByUserId)->first();
+                if ($changer === null || ! $changer->isSupplier()) {
+                    throw new InvalidArgumentException(__('Only the supplier can refund orders.'));
+                }
+            }
 
             if ($old === 'REFUNDED') {
                 throw new InvalidArgumentException('Cannot change status from '.$old.'.');
