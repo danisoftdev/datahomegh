@@ -92,10 +92,17 @@
                                     {{ ($isCredit || $isRefund) ? '+' : '−' }}{{ number_format((float) $row->amount, 2) }} GHS
                                 </span>
                             </div>
+                            <p class="mt-0.5 font-mono text-xs text-emerald-300/90">{{ \App\Support\TransactionReceipt::walletId((int) $row->id) }}</p>
                             @if ($row->reference)
-                                <p class="mt-0.5 truncate font-mono text-xs text-slate-500" title="{{ $row->reference }}">{{ $row->reference }}</p>
+                                <p class="mt-0.5 truncate font-mono text-xs text-slate-500" title="{{ $row->reference }}">{{ __('Ref') }}: {{ $row->reference }}</p>
                             @endif
-                            <p class="mt-1 text-xs text-slate-500">{{ $row->created_at?->diffForHumans() }} · {{ $row->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
+                            @if ($row->note)
+                                <p class="mt-0.5 text-xs text-slate-400">{{ $row->note }}</p>
+                            @endif
+                            <p class="mt-1 text-xs text-slate-500">
+                                {{ \App\Support\TransactionReceipt::formatDateTime($row->created_at) }}
+                            </p>
+                            <p class="font-mono text-[10px] text-slate-600">{{ \App\Support\TransactionReceipt::formatDateTimeShort($row->created_at) }}</p>
                         </div>
                     </li>
                 @empty

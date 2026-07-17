@@ -13,6 +13,7 @@ use App\Services\WalletService;
 use App\Support\PaystackChargeMetadata;
 use App\Support\PaystackPaymentPurpose;
 use App\Support\PaystackVerifyAmount;
+use App\Support\TransactionReceipt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -158,7 +159,7 @@ class WalletController extends Controller
         $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
-            $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
+            $ledger = $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
         } catch (Throwable $e) {
             Log::error('Wallet topup callback failed', ['reference' => $reference, 'exception' => $e]);
 
@@ -170,7 +171,13 @@ class WalletController extends Controller
         $message = __('Wallet topped up successfully.');
 
         if ($authUser !== null) {
-            return redirect()->route('wallet.index')->with('status', $message);
+            $redirect = redirect()->route('wallet.index')->with('status', $message);
+
+            if ($ledger !== null) {
+                $redirect->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger));
+            }
+
+            return $redirect;
         }
 
         return redirect()->route('login')->with('status', $message.' '.__('Sign in to view your balance.'));
@@ -249,7 +256,7 @@ class WalletController extends Controller
 
         $ref = 'admin_credit_'.uniqid('', true);
 
-        $this->walletService->credit(
+        $ledger = $this->walletService->credit(
             (int) $data['user_id'],
             $data['amount'],
             'ADMIN_CREDIT',
@@ -257,7 +264,9 @@ class WalletController extends Controller
             $data['note'] ?? null,
         );
 
-        return back()->with('status', __('Wallet credited.'));
+        return back()
+            ->with('status', __('Wallet credited.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger));
     }
 
     public function adminDebit(Request $request): RedirectResponse
@@ -271,7 +280,7 @@ class WalletController extends Controller
         $ref = 'admin_debit_'.uniqid('', true);
 
         try {
-            $this->walletService->debit(
+            $ledger = $this->walletService->debit(
                 (int) $data['user_id'],
                 $data['amount'],
                 'ADMIN_DEBIT',
@@ -282,7 +291,9 @@ class WalletController extends Controller
             return back()->withErrors(['amount' => $e->getMessage()]);
         }
 
-        return back()->with('status', __('Wallet debited.'));
+        return back()
+            ->with('status', __('Wallet debited.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger));
     }
 
     /**
@@ -290,7 +301,7 @@ class WalletController extends Controller
      *
      * @param  array<string, mixed>  $verifyData
      */
-    private function applyWalletTopupFromPaystack(int $userId, string $reference, string $amountGhs, array $verifyData): void
+    private function applyWalletTopupFromPaystack(int $userId, string $reference, string $amountGhs, array $verifyData): ?WalletLedger
     {
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
         if (PaystackPaymentPurpose::resolve($txn, $verifyData) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
@@ -310,26 +321,34 @@ class WalletController extends Controller
                 'amount_ghs' => $amountGhs,
             ]);
 
-            return;
+            return null;
         }
 
-        DB::transaction(function () use ($userId, $reference, $amountGhs, $verifyData): void {
+        return DB::transaction(function () use ($userId, $reference, $amountGhs, $verifyData): ?WalletLedger {
             $txn = PaystackTransaction::query()->where('reference', $reference)->lockForUpdate()->first();
 
             if ($txn !== null && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
-                return;
+                return null;
             }
 
             if ($txn !== null && $txn->status === 'success' && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::WALLET_TOPUP) {
-                return;
+                return WalletLedger::query()
+                    ->where('user_id', $userId)
+                    ->where('reference', $reference)
+                    ->where('source', 'PAYSTACK')
+                    ->where('type', 'CREDIT')
+                    ->latest('id')
+                    ->first();
             }
 
-            if (WalletLedger::query()
+            $existingLedger = WalletLedger::query()
                 ->where('user_id', $userId)
                 ->where('reference', $reference)
                 ->where('source', 'PAYSTACK')
                 ->where('type', 'CREDIT')
-                ->exists()) {
+                ->first();
+
+            if ($existingLedger !== null) {
                 if ($txn !== null && $txn->status !== 'success') {
                     $txn->fill([
                         'status' => 'success',
@@ -344,10 +363,10 @@ class WalletController extends Controller
                     $txn->save();
                 }
 
-                return;
+                return $existingLedger;
             }
 
-            $this->walletService->credit($userId, $amountGhs, 'PAYSTACK', $reference, null);
+            $ledger = $this->walletService->credit($userId, $amountGhs, 'PAYSTACK', $reference, null);
 
             PaystackTransaction::query()->updateOrCreate(
                 ['reference' => $reference],
@@ -364,6 +383,8 @@ class WalletController extends Controller
                     ),
                 ],
             );
+
+            return $ledger;
         });
     }
 

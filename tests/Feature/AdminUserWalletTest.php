@@ -27,7 +27,9 @@ class AdminUserWalletTest extends TestCase
         $this->actingAs($supplier)->post(route('admin.users.wallet-credit', $buyer), [
             'amount' => 50.25,
             'note' => 'MoMo top-up',
-        ])->assertRedirect()->assertSessionHas('status');
+        ])->assertRedirect()
+            ->assertSessionHas('status')
+            ->assertSessionHas('transaction_receipt.transaction_id');
 
         $buyer->wallet->refresh();
         $this->assertSame('50.25', (string) $buyer->wallet->balance);

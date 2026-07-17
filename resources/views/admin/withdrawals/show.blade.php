@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', __('Withdrawal') . ' #' . $withdrawal->id)
-@section('heading', __('Withdrawal') . ' #' . $withdrawal->id)
+@section('title', __('Withdrawal') . ' ' . \App\Support\TransactionReceipt::withdrawalId((int) $withdrawal->id))
+@section('heading', __('Withdrawal') . ' ' . \App\Support\TransactionReceipt::withdrawalId((int) $withdrawal->id))
 
 @section('content')
     <a href="{{ route('admin.withdrawals.index') }}" class="mb-6 inline-block text-sm text-[#FFD700] hover:underline">← {{ __('Agent withdrawals') }}</a>
@@ -13,8 +13,13 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <div class="rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
             <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-slate-500">{{ __('Transaction ID') }}</dt><dd class="font-mono font-semibold text-[#FFD700]">{{ \App\Support\TransactionReceipt::withdrawalId((int) $withdrawal->id) }}</dd></div>
                 <div><dt class="text-slate-500">{{ __('Agent') }}</dt><dd>{{ $withdrawal->agent?->username }} ({{ $withdrawal->agent?->name }})</dd></div>
                 <div><dt class="text-slate-500">{{ __('Status') }}</dt><dd>{{ $withdrawal->status }}</dd></div>
+                <div><dt class="text-slate-500">{{ __('Requested') }}</dt><dd>{{ \App\Support\TransactionReceipt::formatDateTime($withdrawal->created_at) }}<br><span class="font-mono text-xs text-slate-500">{{ \App\Support\TransactionReceipt::formatDateTimeShort($withdrawal->created_at) }}</span></dd></div>
+                @if ($withdrawal->processed_at)
+                    <div><dt class="text-slate-500">{{ __('Processed') }}</dt><dd>{{ \App\Support\TransactionReceipt::formatDateTime($withdrawal->processed_at) }}<br><span class="font-mono text-xs text-slate-500">{{ \App\Support\TransactionReceipt::formatDateTimeShort($withdrawal->processed_at) }}</span></dd></div>
+                @endif
                 <div><dt class="text-slate-500">{{ __('Amount') }}</dt><dd>{{ number_format((float) $withdrawal->amount, 2) }} GHS</dd></div>
                 <div><dt class="text-slate-500">{{ __('Fee') }}</dt><dd>{{ number_format((float) $withdrawal->fee, 2) }} GHS</dd></div>
                 <div><dt class="text-slate-500">{{ __('Net payout') }}</dt><dd class="font-semibold text-[#FFD700]">{{ number_format((float) $withdrawal->net_amount, 2) }} GHS</dd></div>
