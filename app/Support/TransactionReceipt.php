@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AgentEarningsLedger;
 use App\Models\AgentWithdrawalRequest;
+use App\Models\User;
 use App\Models\WalletLedger;
 use Carbon\CarbonInterface;
 
@@ -98,6 +99,95 @@ final class TransactionReceipt
             'occurred_at' => self::formatDateTime($entry->created_at),
             'occurred_at_short' => self::formatDateTimeShort($entry->created_at),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function ledgerDetails(WalletLedger $ledger, ?User $accountUser = null): array
+    {
+        $performer = self::resolvePerformedBy($ledger);
+
+        return array_merge(self::fromWalletLedger($ledger, $accountUser?->username), [
+            'direction' => match ($ledger->type) {
+                'CREDIT', 'REFUND' => __('Money in'),
+                'DEBIT' => __('Money out'),
+                default => (string) $ledger->type,
+            },
+            'performed_by_role' => $performer['role'],
+            'performed_by_name' => $performer['name'],
+            'performed_by_label' => $performer['label'],
+            'account_name' => $accountUser?->name,
+            'account_username' => $accountUser?->username,
+        ]);
+    }
+
+    /**
+     * @return array{role: string, name: string, label: string}
+     */
+    private static function resolvePerformedBy(WalletLedger $ledger): array
+    {
+        $note = trim((string) ($ledger->note ?? ''));
+        $source = (string) $ledger->source;
+        $type = (string) $ledger->type;
+
+        $role = match ($source) {
+            'ADMIN_CREDIT', 'ADMIN_DEBIT' => __('Platform admin'),
+            'AGENT_CREDIT' => __('Agent'),
+            'PAYSTACK' => __('Paystack'),
+            'ORDER' => __('Self (order checkout)'),
+            'REFUND' => __('Order refund'),
+            default => $source,
+        };
+
+        $name = match ($source) {
+            'PAYSTACK' => 'Paystack',
+            'ADMIN_CREDIT', 'ADMIN_DEBIT' => self::extractActorFromNote($note) ?? __('Admin'),
+            'AGENT_CREDIT' => self::extractActorFromNote($note) ?? __('Agent'),
+            default => $note !== '' ? $note : '—',
+        };
+
+        $label = match (true) {
+            in_array($source, ['ADMIN_CREDIT', 'ADMIN_DEBIT'], true) && $type === 'DEBIT' => __('Debited by'),
+            in_array($source, ['ADMIN_CREDIT', 'ADMIN_DEBIT', 'AGENT_CREDIT'], true) => __('Credited by'),
+            $source === 'PAYSTACK' => __('Paid via'),
+            $type === 'DEBIT' => __('Debited by'),
+            default => __('From'),
+        };
+
+        return [
+            'role' => $role,
+            'name' => $name,
+            'label' => $label,
+        ];
+    }
+
+    private static function extractActorFromNote(string $note): ?string
+    {
+        if ($note === '') {
+            return null;
+        }
+
+        if (preg_match('/\b(?:Admin|Agent)\s+([^\s—\-]+)/iu', $note, $matches)) {
+            return $matches[1];
+        }
+
+        if (preg_match('/\badmin\s+([^\s—\-]+)/iu', $note, $matches)) {
+            return $matches[1];
+        }
+
+        if (preg_match('/\bagent\s+([^\s—\-]+)/iu', $note, $matches)) {
+            return $matches[1];
+        }
+
+        if (str_contains($note, '—')) {
+            $head = trim(explode('—', $note, 2)[0]);
+            if (preg_match('/(\S+)$/', $head, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
     }
 
     private static function walletActionLabel(WalletLedger $ledger): string
