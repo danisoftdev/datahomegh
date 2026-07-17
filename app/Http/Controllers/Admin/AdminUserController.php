@@ -17,6 +17,7 @@ use App\Services\UserAccountPurgeService;
 use App\Services\WalletService;
 use App\Support\PaystackPaymentPurpose;
 use App\Support\PaystackVerifyAmount;
+use App\Support\TransactionReceipt;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -431,7 +432,7 @@ class AdminUserController extends Controller
             : __('Credit from platform admin :admin', ['admin' => $admin->username]);
 
         try {
-            $this->walletService->credit(
+            $ledger = $this->walletService->credit(
                 $user->id,
                 $validated['amount'],
                 'ADMIN_CREDIT',
@@ -449,7 +450,9 @@ class AdminUserController extends Controller
             'wallet_admin_credit',
         );
 
-        return back()->with('status', __('Wallet credited.'));
+        return back()
+            ->with('status', __('Wallet credited.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger, $user->username));
     }
 
     public function debitWallet(Request $request, User $user): RedirectResponse
@@ -471,7 +474,7 @@ class AdminUserController extends Controller
             : __('Debit by platform admin :admin', ['admin' => $admin->username]);
 
         try {
-            $this->walletService->debit(
+            $ledger = $this->walletService->debit(
                 $user->id,
                 $validated['amount'],
                 'ADMIN_DEBIT',
@@ -484,7 +487,9 @@ class AdminUserController extends Controller
             return back()->withErrors(['amount' => $e->getMessage()]);
         }
 
-        return back()->with('status', __('Wallet debited.'));
+        return back()
+            ->with('status', __('Wallet debited.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger, $user->username));
     }
 
     private function assertWalletManageable(User $user): void

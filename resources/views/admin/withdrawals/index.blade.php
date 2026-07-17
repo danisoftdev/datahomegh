@@ -19,24 +19,26 @@
         <table class="w-full text-left text-sm text-slate-300">
             <thead class="text-xs uppercase text-slate-500">
                 <tr>
-                    <th class="px-4 py-3">#</th>
+                    <th class="px-4 py-3">{{ __('Transaction ID') }}</th>
                     <th class="px-4 py-3">{{ __('Agent') }}</th>
                     <th class="px-4 py-3">{{ __('Amount') }}</th>
                     <th class="px-4 py-3">{{ __('Net') }}</th>
                     <th class="px-4 py-3">{{ __('Status') }}</th>
-                    <th class="px-4 py-3">{{ __('When') }}</th>
+                    <th class="px-4 py-3">{{ __('Requested') }}</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($requests as $req)
                     <tr class="border-t border-white/5">
-                        <td class="px-4 py-3">{{ $req->id }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-[#FFD700]">{{ \App\Support\TransactionReceipt::withdrawalId((int) $req->id) }}</td>
                         <td class="px-4 py-3">{{ $req->agent?->username }}</td>
                         <td class="px-4 py-3">{{ number_format((float) $req->amount, 2) }}</td>
                         <td class="px-4 py-3">{{ number_format((float) $req->net_amount, 2) }}</td>
                         <td class="px-4 py-3">{{ $req->status }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">{{ $req->created_at?->format('Y-m-d H:i') }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="block">{{ \App\Support\TransactionReceipt::formatDateTimeShort($req->created_at) }}</span>
+                        </td>
                         <td class="px-4 py-3"><a href="{{ route('admin.withdrawals.show', $req) }}" class="text-[#FFD700] hover:underline">{{ __('View') }}</a></td>
                     </tr>
                 @endforeach

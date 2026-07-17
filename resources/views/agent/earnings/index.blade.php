@@ -78,10 +78,14 @@
                 @forelse ($withdrawals as $w)
                     <div class="rounded-lg border border-white/10 bg-black/20 p-3">
                         <div class="flex justify-between gap-2">
-                            <span class="font-medium text-white">#{{ $w->id }} · {{ number_format((float) $w->amount, 2) }} GHS</span>
+                            <span class="font-medium text-white">{{ \App\Support\TransactionReceipt::withdrawalId((int) $w->id) }} · {{ number_format((float) $w->amount, 2) }} GHS</span>
                             <span class="text-slate-400">{{ $w->status }}</span>
                         </div>
-                        <p class="mt-1 text-xs text-slate-500">{{ $w->created_at?->format('Y-m-d H:i') }} · {{ __('Net') }} {{ number_format((float) $w->net_amount, 2) }} GHS</p>
+                        <p class="mt-1 text-xs text-slate-500">
+                            {{ \App\Support\TransactionReceipt::formatDateTime($w->created_at) }}
+                        </p>
+                        <p class="font-mono text-[10px] text-slate-600">{{ \App\Support\TransactionReceipt::formatDateTimeShort($w->created_at) }}</p>
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Net') }} {{ number_format((float) $w->net_amount, 2) }} GHS · {{ __('Fee') }} {{ number_format((float) $w->fee, 2) }} GHS</p>
                     </div>
                 @empty
                     <p class="text-slate-500">{{ __('No withdrawal requests yet.') }}</p>
@@ -95,19 +99,25 @@
             <table class="mt-2 w-full text-left text-sm">
                 <thead class="text-xs uppercase text-slate-500">
                     <tr>
-                        <th class="py-2">{{ __('When') }}</th>
+                        <th class="py-2">{{ __('Transaction ID') }}</th>
+                        <th class="py-2">{{ __('Date & time') }}</th>
                         <th class="py-2">{{ __('Type') }}</th>
                         <th class="py-2">{{ __('Amount') }}</th>
                         <th class="py-2">{{ __('Balance') }}</th>
+                        <th class="py-2">{{ __('Reference') }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-slate-300">
                     @foreach ($ledger as $entry)
                         <tr class="border-t border-white/5">
-                            <td class="py-2 whitespace-nowrap">{{ $entry->created_at?->format('Y-m-d H:i') }}</td>
+                            <td class="py-2 font-mono text-xs text-emerald-300">{{ \App\Support\TransactionReceipt::earningsId((int) $entry->id) }}</td>
+                            <td class="py-2 whitespace-nowrap">
+                                <span class="block">{{ \App\Support\TransactionReceipt::formatDateTimeShort($entry->created_at) }}</span>
+                            </td>
                             <td class="py-2">{{ $entry->source }}</td>
                             <td class="py-2">{{ $entry->type === 'CREDIT' ? '+' : '-' }}{{ number_format((float) $entry->amount, 2) }}</td>
                             <td class="py-2">{{ number_format((float) $entry->balance_after, 2) }}</td>
+                            <td class="py-2 max-w-[8rem] truncate font-mono text-xs text-slate-500" title="{{ $entry->reference }}">{{ $entry->reference ?: '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

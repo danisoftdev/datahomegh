@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\WalletService;
 use App\Support\AgentShopBuyerPolicy;
+use App\Support\TransactionReceipt;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -94,7 +95,7 @@ class AgentBuyerController extends Controller
             ? __('Agent :agent — :note', ['agent' => $agent->username, 'note' => $extra])
             : __('Credit from agent :agent', ['agent' => $agent->username]);
 
-        $this->walletService->credit(
+        $ledger = $this->walletService->credit(
             $buyer->id,
             $validated['amount'],
             'AGENT_CREDIT',
@@ -109,7 +110,9 @@ class AgentBuyerController extends Controller
             'wallet_agent_credit',
         );
 
-        return back()->with('status', __('Buyer wallet credited.'));
+        return back()
+            ->with('status', __('Buyer wallet credited.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWalletLedger($ledger, $buyer->username));
     }
 
     /**

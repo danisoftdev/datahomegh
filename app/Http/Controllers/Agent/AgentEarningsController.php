@@ -7,6 +7,7 @@ use App\Models\AgentEarningsLedger;
 use App\Models\AgentWithdrawalRequest;
 use App\Services\AgentCommissionService;
 use App\Services\AgentWithdrawalService;
+use App\Support\TransactionReceipt;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -74,7 +75,7 @@ class AgentEarningsController extends Controller
             ];
 
         try {
-            $this->agentWithdrawalService->requestWithdrawal(
+            $withdrawal = $this->agentWithdrawalService->requestWithdrawal(
                 $request->user(),
                 (string) $validated['amount'],
                 $validated['agent_note'] ?? null,
@@ -85,6 +86,8 @@ class AgentEarningsController extends Controller
             return back()->withInput()->withErrors(['amount' => $e->getMessage()]);
         }
 
-        return back()->with('status', __('Withdrawal request submitted.'));
+        return back()
+            ->with('status', __('Withdrawal request submitted.'))
+            ->with('transaction_receipt', TransactionReceipt::fromWithdrawal($withdrawal));
     }
 }
