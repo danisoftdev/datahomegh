@@ -204,24 +204,49 @@
         </table>
     </div>
 
-    <div class="mt-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
+    <div class="mt-8 rounded-xl border border-white/10 bg-[#16213E]/80 p-6" x-data="{ open: false, detail: null, openDetail(payload) { this.detail = payload; this.open = true; }, closeDetail() { this.open = false; } }">
         <h3 class="mb-4 font-semibold text-white">{{ __('Wallet ledger') }}</h3>
         {{ $ledger->links() }}
-        <table class="mt-2 w-full text-left text-sm text-slate-300">
-            <thead class="text-xs uppercase text-slate-500">
-                <tr><th class="py-2">{{ __('Type') }}</th><th class="py-2">{{ __('Amount') }}</th><th class="py-2">{{ __('After') }}</th><th class="py-2">{{ __('Source') }}</th><th class="py-2">{{ __('Ref') }}</th></tr>
-            </thead>
-            <tbody>
-                @foreach ($ledger as $row)
-                    <tr class="border-t border-white/5">
-                        <td class="py-2">{{ $row->type }}</td>
-                        <td class="py-2">{{ $row->amount }}</td>
-                        <td class="py-2">{{ $row->balance_after }}</td>
-                        <td class="py-2">{{ $row->source }}</td>
-                        <td class="py-2 font-mono text-xs">{{ \Illuminate\Support\Str::limit($row->reference ?? '', 16) }}</td>
+        <div class="overflow-x-auto">
+            <table class="mt-2 w-full min-w-[48rem] text-left text-sm text-slate-300">
+                <thead class="text-xs uppercase text-slate-500">
+                    <tr>
+                        <th class="py-2 pr-3">{{ __('Transaction ID') }}</th>
+                        <th class="py-2 pr-3">{{ __('Date & time') }}</th>
+                        <th class="py-2 pr-3">{{ __('Type') }}</th>
+                        <th class="py-2 pr-3">{{ __('Amount') }}</th>
+                        <th class="py-2 pr-3">{{ __('After') }}</th>
+                        <th class="py-2 pr-3">{{ __('Source') }}</th>
+                        <th class="py-2 pr-3">{{ __('Ref') }}</th>
+                        <th class="py-2">{{ __('Details') }}</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach ($ledger as $row)
+                        <tr class="border-t border-white/5">
+                            <td class="py-2 pr-3 font-mono text-xs text-[#FFD700]">{{ \App\Support\TransactionReceipt::walletId((int) $row->id) }}</td>
+                            <td class="py-2 pr-3 whitespace-nowrap">
+                                <span class="block">{{ \App\Support\TransactionReceipt::formatDateTimeShort($row->created_at) }}</span>
+                            </td>
+                            <td class="py-2 pr-3">{{ $row->type }}</td>
+                            <td class="py-2 pr-3 tabular-nums">{{ number_format((float) $row->amount, 2) }}</td>
+                            <td class="py-2 pr-3 tabular-nums">{{ number_format((float) $row->balance_after, 2) }}</td>
+                            <td class="py-2 pr-3">{{ $row->source }}</td>
+                            <td class="py-2 pr-3 font-mono text-xs">{{ \Illuminate\Support\Str::limit($row->reference ?? '—', 20) }}</td>
+                            <td class="py-2">
+                                <button
+                                    type="button"
+                                    class="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
+                                    @click="openDetail(@js(\App\Support\TransactionReceipt::ledgerDetails($row, $user)))"
+                                >
+                                    {{ __('Details') }}
+                                </button>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @include('partials.wallet-ledger-detail-modal')
     </div>
 @endsection

@@ -66,7 +66,7 @@
             </div>
         @endif
 
-        <div id="ledger" class="scroll-mt-24 rounded-2xl border border-white/10 bg-navy/80 p-6 shadow-xl backdrop-blur-sm">
+        <div id="ledger" class="scroll-mt-24 rounded-2xl border border-white/10 bg-navy/80 p-6 shadow-xl backdrop-blur-sm" x-data="{ open: false, detail: null, openDetail(payload) { this.detail = payload; this.open = true; }, closeDetail() { this.open = false; } }">
             <h2 class="text-lg font-semibold text-white">{{ __('Transaction history') }}</h2>
             <ul class="mt-4 divide-y divide-white/5">
                 @forelse ($ledger as $row)
@@ -104,6 +104,15 @@
                             </p>
                             <p class="font-mono text-[10px] text-slate-600">{{ \App\Support\TransactionReceipt::formatDateTimeShort($row->created_at) }}</p>
                         </div>
+                        <div class="shrink-0 self-center">
+                            <button
+                                type="button"
+                                class="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-white/10"
+                                @click="openDetail(@js(\App\Support\TransactionReceipt::ledgerDetails($row, auth()->user())))"
+                            >
+                                {{ __('Details') }}
+                            </button>
+                        </div>
                     </li>
                 @empty
                     <li class="py-8 text-center text-slate-500">{{ __('No transactions yet.') }}</li>
@@ -112,6 +121,7 @@
             <div class="mt-4">
                 {{ $ledger->links() }}
             </div>
+            @include('partials.wallet-ledger-detail-modal')
         </div>
     </div>
 @endsection
