@@ -1,16 +1,18 @@
-<div
-    x-show="open"
-    x-cloak
-    class="fixed inset-0 z-[120] flex items-center justify-center p-4"
-    @keydown.escape.window="closeDetail()"
->
-    <div class="absolute inset-0 bg-black/75" @click="closeDetail()"></div>
+<template x-teleport="body">
     <div
-        class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#1A1A2E] p-6 shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wallet-ledger-detail-title"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 z-200 flex items-center justify-center p-4"
+        @keydown.escape.window="closeDetail()"
     >
+        <div class="absolute inset-0 bg-black/75" @click="closeDetail()"></div>
+        <div
+            class="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#1A1A2E] p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wallet-ledger-detail-title"
+            @click.stop
+        >
         <div class="flex items-start justify-between gap-3">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wide text-emerald-300">{{ __('Transaction details') }}</p>
@@ -85,5 +87,6 @@
                 </template>
             </dl>
         </template>
+        </div>
     </div>
-</div>
+</template>

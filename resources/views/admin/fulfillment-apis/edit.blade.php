@@ -48,10 +48,9 @@
                 </p>
             @elseif ($profile->isEncarta())
                 <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
-                    {{ __('MTN Encarta uses POST :path with networkKey :key — recipient, capacity (GB from bundle size), and order reference. Status via GET :status.', [
+                    {{ __('MTN Encarta uses POST :path with bundle_id, recipient, idempotency_key, and webhook_url. Set FULFILLMENT_ENCARTA_WEBHOOK_SECRET in .env. Status updates via signed webhooks to :url.', [
                         'path' => config('datahome.fulfillment.providers.encarta.place_path', '/purchase'),
-                        'key' => \App\Support\EncartaMtnNetwork::resolve(),
-                        'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
+                        'url' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
                     ]) }}
                 </p>
             @else

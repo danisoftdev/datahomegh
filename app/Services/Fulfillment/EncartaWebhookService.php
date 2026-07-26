@@ -10,14 +10,23 @@ final class EncartaWebhookService
 {
     public function verifySignature(string $rawBody, ?string $signatureHeader): bool
     {
-        if ($signatureHeader === null || $signatureHeader === '') {
+        if ($signatureHeader === null || trim($signatureHeader) === '') {
             return false;
         }
 
-        $secret = (string) config('datahome.fulfillment.providers.encarta.webhook_secret', 'direct');
-        $expected = 'sha256='.hash_hmac('sha256', $rawBody, $secret);
+        $secret = trim((string) config('datahome.fulfillment.providers.encarta.webhook_secret', ''));
+        if ($secret === '') {
+            return false;
+        }
 
-        return hash_equals($expected, $signatureHeader);
+        $provided = trim($signatureHeader);
+        if (str_starts_with(strtolower($provided), 'sha256=')) {
+            $provided = substr($provided, 7);
+        }
+
+        $expected = hash_hmac('sha256', $rawBody, $secret);
+
+        return hash_equals($expected, $provided);
     }
 
     /**
@@ -26,9 +35,10 @@ final class EncartaWebhookService
     public function handle(array $payload, ?string $eventHeader = null): void
     {
         $event = (string) ($payload['event'] ?? $eventHeader ?? '');
-        $data = $payload['data'] ?? [];
-        if (! is_array($data)) {
-            Log::warning('encarta_webhook_missing_data', ['event' => $event]);
+        $orderData = $this->extractOrderData($payload);
+
+        if ($orderData === []) {
+            Log::warning('encarta_webhook_missing_order_payload', ['event' => $event]);
 
             return;
         }
@@ -39,19 +49,19 @@ final class EncartaWebhookService
             return;
         }
 
-        $order = $this->findOrder($data);
+        $order = $this->findOrder($orderData);
         if ($order === null) {
             Log::warning('encarta_webhook_order_not_found', [
                 'event' => $event,
-                'reference' => $data['reference'] ?? null,
-                'provider_reference' => $data['provider_reference'] ?? null,
+                'reference' => $orderData['reference'] ?? null,
+                'order_id' => $orderData['id'] ?? null,
             ]);
 
             return;
         }
 
-        $providerStatus = is_string($data['status'] ?? null) ? (string) $data['status'] : null;
-        $providerReference = is_string($data['provider_reference'] ?? null) ? (string) $data['provider_reference'] : null;
+        $providerStatus = is_string($orderData['status'] ?? null) ? (string) $orderData['status'] : null;
+        $providerReference = is_string($orderData['reference'] ?? null) ? (string) $orderData['reference'] : null;
 
         $updates = [
             'provider_status' => $providerStatus ?? $order->provider_status,
@@ -83,14 +93,43 @@ final class EncartaWebhookService
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function extractOrderData(array $payload): array
+    {
+        if (isset($payload['order']) && is_array($payload['order'])) {
+            return $payload['order'];
+        }
+
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            return $payload['data'];
+        }
+
+        return [];
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function findOrder(array $data): ?Order
     {
         $reference = trim((string) ($data['reference'] ?? ''));
-        $providerReference = trim((string) ($data['provider_reference'] ?? ''));
+        $orderId = $data['id'] ?? $data['order_id'] ?? null;
 
-        foreach (array_values(array_unique(array_filter([$reference, $providerReference]))) as $candidate) {
+        $candidates = array_values(array_unique(array_filter([
+            $reference,
+            is_int($orderId) ? (string) $orderId : (is_string($orderId) ? $orderId : null),
+        ])));
+
+        foreach ($candidates as $candidate) {
+            if (preg_match('/^dhgh_(\d+)$/', $candidate, $matches)) {
+                $order = Order::query()->whereKey((int) $matches[1])->first();
+                if ($order !== null && $this->isEncartaOrder($order)) {
+                    return $order;
+                }
+            }
+
             if (ctype_digit($candidate)) {
                 $order = Order::query()->whereKey((int) $candidate)->first();
                 if ($order !== null && $this->isEncartaOrder($order)) {

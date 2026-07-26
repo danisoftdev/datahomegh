@@ -106,6 +106,19 @@ class DataPackageFulfillmentTest extends TestCase
     /**
      * @return array<string, mixed>
      */
+    private function encartaBundlesResponse(int $bundleId = 42, int $capacityGb = 2): array
+    {
+        return [
+            'status' => 'success',
+            'data' => [
+                ['id' => $bundleId, 'capacity_gb' => $capacityGb, 'network_code' => 'mtn'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function encartaPlaceSuccessResponse(): array
     {
         return [
@@ -219,6 +232,7 @@ class DataPackageFulfillmentTest extends TestCase
         ]);
 
         Http::fake([
+            'https://provider.test/api/bundles*' => Http::response($this->encartaBundlesResponse(), 200),
             'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
         ]);
 
@@ -437,10 +451,11 @@ class DataPackageFulfillmentTest extends TestCase
             'api root' => ['https://encartastores.com/api', 'https://encartastores.com/api'],
             'ishare path' => ['https://encartastores.com/api/ishare', 'https://encartastores.com/api'],
             'purchase path' => ['https://encartastores.com/api/purchase', 'https://encartastores.com/api'],
+            'bundles path' => ['https://encartastores.com/api/bundles', 'https://encartastores.com/api'],
         ];
     }
 
-    public function test_mtn_data_dispatches_to_encarta_purchase_with_yello(): void
+    public function test_mtn_data_dispatches_to_encarta_purchase_with_bundle_id(): void
     {
         $supplier = $this->supplier();
         $this->encartaProfile($supplier);
@@ -457,6 +472,7 @@ class DataPackageFulfillmentTest extends TestCase
         ]);
 
         Http::fake([
+            'https://provider.test/api/bundles*' => Http::response($this->encartaBundlesResponse(), 200),
             'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
         ]);
 
@@ -475,16 +491,15 @@ class DataPackageFulfillmentTest extends TestCase
             return $request->url() === 'https://provider.test/api/purchase'
                 && $request->hasHeader('X-API-Key', 'encarta-key')
                 && $request['recipient'] === '0244123456'
-                && $request['capacity'] === 2
-                && $request['networkKey'] === 'YELLO'
-                && $request['reference'] === (string) $order->id
+                && $request['bundle_id'] === 42
+                && $request['idempotency_key'] === 'dhgh_'.$order->id
                 && $request['webhook_url'] === EncartaWebhookService::webhookUrl();
         });
 
         $this->assertSame('ENC-123', $order->provider_order_reference);
     }
 
-    public function test_admin_can_refresh_encarta_provider_status(): void
+    public function test_encarta_uses_provider_bundle_type_when_set(): void
     {
         $supplier = $this->supplier();
         $this->encartaProfile($supplier);
@@ -493,8 +508,9 @@ class DataPackageFulfillmentTest extends TestCase
             'agent_id' => null,
             'network' => 'MTN',
             'package_kind' => 'data',
-            'name' => 'MTN 1GB',
-            'size_label' => '1GB',
+            'name' => 'MTN 2GB',
+            'size_label' => '2GB',
+            'provider_bundle_type' => '99',
             'internal_cost' => '5.00',
             'stock_count' => 10,
             'is_available' => true,
@@ -511,22 +527,54 @@ class DataPackageFulfillmentTest extends TestCase
             'phone_number' => '0244123456',
             'bundle_package_id' => $bundle->id,
             'confirm' => true,
+        ])->assertRedirect(route('buyer.orders.index'));
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://provider.test/api/purchase'
+                && $request['bundle_id'] === 99;
+        });
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/bundles'));
+    }
+
+    public function test_admin_refresh_encarta_provider_status_is_webhook_only(): void
+    {
+        $supplier = $this->supplier();
+        $this->encartaProfile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 1GB',
+            'size_label' => '1GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/bundles*' => Http::response($this->encartaBundlesResponse(42, 1), 200),
+            'https://provider.test/api/purchase' => Http::response($this->encartaPlaceSuccessResponse(), 200),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
         ]);
 
         $order = Order::query()->latest('id')->firstOrFail();
         $this->assertSame('ENC-123', $order->provider_order_reference);
 
-        Http::fake([
-            'https://provider.test/api/ishare-status?reference=ENC-123' => Http::response([
-                'success' => true,
-                'data' => ['status' => 'completed'],
-            ], 200),
-        ]);
-
         $this->actingAs($supplier)->post(route('admin.orders.refresh-provider-status', $order))
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHas('error');
 
-        $this->assertSame('completed', (string) $order->fresh()->provider_status);
+        $this->assertSame('pending', $order->fresh()->provider_status);
     }
 
     public function test_mtn_data_dispatches_to_geonet_and_stores_order_id_reference(): void
