@@ -12,27 +12,33 @@ use Throwable;
 
 final class EncartaFulfillmentClient
 {
+    public function __construct(
+        private readonly EncartaCatalogResolver $catalogResolver,
+    ) {}
+
     /**
-     * @return array{ok: bool, message: string}
+     * @return array{ok: bool, message: string, reference?: string, status?: string}
      */
-    public function place(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile, string $network): array
+    public function place(Order $order, BundlePackage $bundle, FulfillmentApiProfile $profile, string $productCode): array
     {
+        $bundleId = $this->resolveBundleId($profile, $bundle, $productCode);
+        if ($bundleId === null) {
+            return [
+                'ok' => false,
+                'message' => __('Encarta bundle_id is missing. Set Provider bundle code on this package (Encarta bundle ID from GET /bundles) or match size label to catalogue capacity.'),
+            ];
+        }
+
         $base = FulfillmentApiProfile::normalizeEncartaBaseUrl((string) $profile->base_url);
         $placePath = (string) config('datahome.fulfillment.providers.encarta.place_path', '/purchase');
         $url = $base.$placePath;
-        $ref = (string) $order->id;
-        $capacity = $this->capacityForBundle($bundle);
 
         $payload = [
+            'bundle_id' => $bundleId,
             'recipient' => GhanaPhoneNumber::forLocal((string) $order->phone_number),
-            'capacity' => $capacity,
-            'reference' => $ref,
+            'idempotency_key' => 'dhgh_'.$order->id,
+            'webhook_url' => EncartaWebhookService::webhookUrl(),
         ];
-
-        if ($this->usesPurchaseEndpoint($placePath)) {
-            $payload['networkKey'] = strtoupper(trim($network));
-            $payload['webhook_url'] = EncartaWebhookService::webhookUrl();
-        }
 
         try {
             $response = Http::timeout(25)
@@ -48,7 +54,7 @@ final class EncartaFulfillmentClient
                 'message' => $e->getMessage(),
             ]);
 
-            return ['ok' => false, 'message' => __('Could not reach provider: :msg', ['msg' => $e->getMessage()])];
+            return ['ok' => false, 'message' => __('Could not reach Encarta: :msg', ['msg' => $e->getMessage()])];
         }
 
         if (! $response->successful()) {
@@ -61,63 +67,48 @@ final class EncartaFulfillmentClient
         }
 
         if ($this->responseIndicatesFailure($json)) {
-            $msg = (string) ($json['message'] ?? __('Encarta did not accept the order.'));
+            $msg = $this->extractErrorMessage($json);
 
             return ['ok' => false, 'message' => $msg];
         }
 
-        $providerRef = $this->extractReference($json, $ref);
-        $status = $this->extractStatus($json);
+        $data = is_array($json['data'] ?? null) ? $json['data'] : [];
+        $providerRef = $this->extractReference($data, (string) $order->id);
+        $status = $this->extractStatus($data);
 
         return [
             'ok' => true,
             'message' => __('Order sent to Encarta. Reference: :ref', ['ref' => $providerRef]),
             'reference' => $providerRef,
-            'status' => $status ?? 'pending',
+            'status' => $status ?? 'accepted',
         ];
     }
 
     /**
-     * @return array{ok: bool, message: string}
+     * Encarta v2 documents status via signed webhooks; no public poll endpoint.
+     *
+     * @return array{ok: bool, message: string, status?: string|null}
      */
     public function refreshStatus(Order $order, FulfillmentApiProfile $profile, string $reference): array
     {
-        $base = FulfillmentApiProfile::normalizeEncartaBaseUrl((string) $profile->base_url);
-        $statusPath = (string) config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status');
-        $url = $base.$statusPath.'?'.http_build_query(['reference' => $reference]);
-
-        try {
-            $response = Http::timeout(25)
-                ->withHeaders([
-                    'X-API-Key' => (string) $profile->api_key,
-                    'Accept' => 'application/json',
-                ])
-                ->get($url);
-        } catch (Throwable $e) {
-            Log::warning('encarta_fulfillment_status_request_failed', [
-                'order_id' => $order->id,
-                'message' => $e->getMessage(),
-            ]);
-
-            return ['ok' => false, 'message' => __('Could not reach provider: :msg', ['msg' => $e->getMessage()])];
-        }
-
-        if (! $response->successful()) {
-            return ['ok' => false, 'message' => __('Provider returned HTTP :code.', ['code' => $response->status()])];
-        }
-
-        $json = $response->json();
-        if (! is_array($json) || $this->responseIndicatesFailure($json)) {
-            return ['ok' => false, 'message' => __('Provider did not confirm success.')];
-        }
-
-        $status = $this->extractStatus($json);
+        unset($order, $profile, $reference);
 
         return [
-            'ok' => true,
-            'message' => __('Provider status updated.'),
-            'status' => is_string($status) ? $status : null,
+            'ok' => false,
+            'message' => __('Encarta order status updates via webhooks. Register :url in your Encarta API Dashboard.', [
+                'url' => EncartaWebhookService::webhookUrl(),
+            ]),
         ];
+    }
+
+    private function resolveBundleId(FulfillmentApiProfile $profile, BundlePackage $bundle, string $productCode): ?int
+    {
+        $code = trim($productCode);
+        if ($code !== '' && ctype_digit($code)) {
+            return (int) $code;
+        }
+
+        return $this->catalogResolver->resolveBundleId($profile, $bundle);
     }
 
     /**
@@ -125,26 +116,44 @@ final class EncartaFulfillmentClient
      */
     private function responseIndicatesFailure(array $json): bool
     {
+        $status = strtolower((string) ($json['status'] ?? ''));
+        if ($status === 'error') {
+            return true;
+        }
+
         if (array_key_exists('success', $json) && $json['success'] === false) {
             return true;
         }
 
-        $status = strtolower((string) ($json['status'] ?? data_get($json, 'data.status', '')));
+        $dataStatus = strtolower((string) data_get($json, 'data.status', ''));
 
-        return in_array($status, ['failed', 'error', 'cancelled'], true);
+        return in_array($dataStatus, ['failed', 'error', 'cancelled'], true);
     }
 
     /**
      * @param  array<string, mixed>  $json
      */
-    private function extractReference(array $json, string $fallback): string
+    private function extractErrorMessage(array $json): string
+    {
+        $errors = $json['errors'] ?? null;
+        if (is_array($errors) && $errors !== []) {
+            $first = reset($errors);
+
+            return is_string($first) ? $first : __('Encarta rejected the order.');
+        }
+
+        return (string) ($json['message'] ?? __('Encarta did not accept the order.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function extractReference(array $data, string $fallback): string
     {
         $candidates = [
-            data_get($json, 'data.reference'),
-            data_get($json, 'data.transaction_id'),
-            data_get($json, 'data.id'),
-            data_get($json, 'reference'),
-            data_get($json, 'transaction_id'),
+            $data['reference'] ?? null,
+            $data['order_id'] ?? null,
+            $data['id'] ?? null,
         ];
 
         foreach ($candidates as $candidate) {
@@ -160,34 +169,18 @@ final class EncartaFulfillmentClient
     }
 
     /**
-     * @param  array<string, mixed>  $json
+     * @param  array<string, mixed>  $data
      */
-    private function extractStatus(array $json): ?string
+    private function extractStatus(array $data): ?string
     {
-        $status = data_get($json, 'data.status') ?? data_get($json, 'data.order.status') ?? ($json['status'] ?? null);
+        $status = $data['status'] ?? null;
 
         return is_string($status) && $status !== '' ? $status : null;
     }
 
-    private function capacityForBundle(BundlePackage $bundle): int
-    {
-        if (preg_match('/(\d+)/', (string) $bundle->size_label, $matches)) {
-            return max(1, (int) $matches[1]);
-        }
-
-        return 1;
-    }
-
-    private function usesPurchaseEndpoint(string $placePath): bool
-    {
-        return $placePath === '/purchase'
-            || str_ends_with($placePath, '/purchase')
-            || str_ends_with($placePath, '/bulk-purchase');
-    }
-
     private function httpErrorMessage(int $code, string $url, string $body): string
     {
-        return __('Provider returned HTTP :code for :url. :body', [
+        return __('Encarta returned HTTP :code for :url. :body', [
             'code' => $code,
             'url' => $url,
             'body' => strlen($body) > 200 ? substr($body, 0, 200).'…' : $body,

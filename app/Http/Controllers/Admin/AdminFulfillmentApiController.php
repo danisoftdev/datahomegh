@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FulfillmentApiProfile;
-use App\Support\EncartaMtnNetwork;
 use App\Support\FulfillmentProviderType;
 use App\Support\GeonetMtnNetworkKey;
 use App\Support\IgetTelecelBundleType;
@@ -216,8 +215,8 @@ class AdminFulfillmentApiController extends Controller
             'encarta' => [
                 'network' => 'MTN',
                 'baseUrl' => config('datahome.fulfillment.providers.encarta.default_base_url'),
-                'baseHint' => __('Encarta API base. MTN data uses POST /purchase with networkKey YELLO.'),
-                'autoKeyNote' => __('MTN Encarta: POST /purchase (networkKey YELLO, recipient, capacity GB). Status updates via webhook :url or Encarta Credentials global URL.', [
+                'baseHint' => __('Encarta API base. MTN data uses POST /purchase with bundle_id from GET /bundles.'),
+                'autoKeyNote' => __('MTN Encarta: POST /purchase (bundle_id, recipient, idempotency_key, webhook_url). Set FULFILLMENT_ENCARTA_WEBHOOK_SECRET in .env. Status via signed webhooks to :url.', [
                     'url' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
                 ]),
                 'keyLabel' => __('Encarta X-API-Key'),

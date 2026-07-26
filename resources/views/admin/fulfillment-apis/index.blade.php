@@ -26,10 +26,10 @@
         </p>
         <p class="rounded-lg border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-sm text-violet-100">
             <strong class="text-violet-200">{{ __('MTN — Encarta Stores') }}</strong><br>
-            {{ __('Base: :api. Auth: X-API-Key from API Management. POST :path · GET :status.', [
+            {{ __('Base: :api. Auth: X-API-Key from API Management. POST :path · GET /bundles · webhooks at :webhook.', [
                 'api' => config('datahome.fulfillment.providers.encarta.default_base_url'),
                 'path' => config('datahome.fulfillment.providers.encarta.place_path', '/purchase'),
-                'status' => config('datahome.fulfillment.providers.encarta.status_path', '/ishare-status'),
+                'webhook' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
             ]) }}
         </p>
     </div>
@@ -154,7 +154,7 @@
                         @if ($profile->isGeonet())
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN API key:') }} <span class="font-mono text-slate-300">{{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span></p>
                         @elseif ($profile->isEncarta())
-                            <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/purchase') }}</span> · networkKey <span class="font-mono text-slate-300">{{ \App\Support\EncartaMtnNetwork::resolve() }}</span></p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/purchase') }}</span> · {{ __('bundle_id from package or GET /bundles') }}</p>
                         @elseif ($profile->isIget())
                             <p class="mt-1 text-xs text-slate-500">{{ __('Telecel bundleType:') }} <span class="font-mono text-slate-300">{{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span></p>
                         @endif

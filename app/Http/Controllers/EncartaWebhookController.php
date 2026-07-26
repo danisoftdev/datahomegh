@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\Fulfillment\EncartaWebhookService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
 final class EncartaWebhookController extends Controller
@@ -13,20 +13,21 @@ final class EncartaWebhookController extends Controller
         private readonly EncartaWebhookService $encartaWebhookService,
     ) {}
 
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): JsonResponse
     {
         $raw = $request->getContent();
-        $signature = $request->header('X-Webhook-Signature');
+        $signature = $request->header('X-Pristarx-Signature')
+            ?? $request->header('X-Webhook-Signature');
 
         if (! $this->encartaWebhookService->verifySignature($raw, is_string($signature) ? $signature : null)) {
-            return response('Unauthorized', 401);
+            return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         $payload = json_decode($raw, true);
         if (! is_array($payload)) {
             Log::warning('encarta_webhook_invalid_json');
 
-            return response('Bad Request', 400);
+            return response()->json(['error' => 'Bad Request'], 400);
         }
 
         try {
@@ -41,6 +42,6 @@ final class EncartaWebhookController extends Controller
             ]);
         }
 
-        return response('ok', 200);
+        return response()->json(['received' => true], 200);
     }
 }

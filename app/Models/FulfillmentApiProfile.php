@@ -125,6 +125,7 @@ class FulfillmentApiProfile extends Model
             '/purchase',
             '/afa-status',
             '/balance',
+            '/bundles',
         ] as $suffix) {
             $len = strlen($suffix);
             if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {

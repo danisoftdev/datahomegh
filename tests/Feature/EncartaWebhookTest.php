@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\FulfillmentProviderType;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class EncartaWebhookTest extends TestCase
@@ -20,14 +21,15 @@ class EncartaWebhookTest extends TestCase
     {
         parent::setUp();
         $this->seed(RolesAndPermissionsSeeder::class);
+        Config::set('datahome.fulfillment.providers.encarta.webhook_secret', 'test-webhook-secret');
     }
 
     public function test_encarta_webhook_rejects_invalid_signature(): void
     {
-        $body = json_encode(['event' => 'order.delivered', 'data' => []], JSON_THROW_ON_ERROR);
+        $body = json_encode(['event' => 'order.delivered', 'order' => []], JSON_THROW_ON_ERROR);
 
         $this->call('POST', route('webhooks.encarta'), [], [], [], [
-            'HTTP_X_WEBHOOK_SIGNATURE' => 'sha256=invalid',
+            'HTTP_X_PRISTARX_SIGNATURE' => 'invalid',
             'CONTENT_TYPE' => 'application/json',
         ], $body)
             ->assertStatus(401);
@@ -55,7 +57,7 @@ class EncartaWebhookTest extends TestCase
         $payload = [
             'event' => 'order.delivered',
             'timestamp' => now()->toIso8601String(),
-            'data' => [
+            'order' => [
                 'reference' => 'ENC-123',
                 'status' => 'delivered',
                 'recipient' => '0244123456',
@@ -69,13 +71,13 @@ class EncartaWebhookTest extends TestCase
 
         $this->call('POST', route('webhooks.encarta'), [], [], [], $this->signedHeaders($body), $body)
             ->assertOk()
-            ->assertSee('ok');
+            ->assertJson(['received' => true]);
 
         $order->refresh();
 
         $this->assertSame('PROCESSING', $order->status);
         $this->assertSame('delivered', $order->provider_status);
-        $this->assertSame('PROV_XYZ', $order->provider_order_reference);
+        $this->assertSame('ENC-123', $order->provider_order_reference);
     }
 
     public function test_encarta_webhook_order_failed_updates_provider_status_only(): void
@@ -98,7 +100,7 @@ class EncartaWebhookTest extends TestCase
 
         $payload = [
             'event' => 'order.failed',
-            'data' => [
+            'order' => [
                 'reference' => '42',
                 'status' => 'failed',
                 'recipient' => '0244123456',
@@ -108,10 +110,50 @@ class EncartaWebhookTest extends TestCase
         $body = json_encode($payload, JSON_THROW_ON_ERROR);
 
         $this->call('POST', route('webhooks.encarta'), [], [], [], $this->signedHeaders($body), $body)
-            ->assertOk();
+            ->assertOk()
+            ->assertJson(['received' => true]);
 
         $this->assertSame('PROCESSING', $order->fresh()->status);
         $this->assertSame('failed', $order->fresh()->provider_status);
+    }
+
+    public function test_encarta_webhook_accepts_legacy_data_payload_and_signature_header(): void
+    {
+        $supplier = $this->supplier();
+        $profile = $this->encartaProfile($supplier);
+        $buyer = $this->buyer();
+        $bundle = $this->bundle();
+
+        $order = Order::query()->create([
+            'user_id' => $buyer->id,
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'amount' => '5.00',
+            'status' => 'PROCESSING',
+            'provider_order_reference' => 'ENC-456',
+            'fulfillment_api_profile_id' => $profile->id,
+        ]);
+
+        $payload = [
+            'event' => 'order.delivered',
+            'data' => [
+                'reference' => 'ENC-456',
+                'status' => 'delivered',
+            ],
+        ];
+
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $secret = (string) config('datahome.fulfillment.providers.encarta.webhook_secret');
+
+        $this->call('POST', route('webhooks.encarta'), [], [], [], [
+            'HTTP_X_WEBHOOK_SIGNATURE' => 'sha256='.hash_hmac('sha256', $body, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $body)
+            ->assertOk()
+            ->assertJson(['received' => true]);
+
+        $this->assertSame('delivered', $order->fresh()->provider_status);
     }
 
     private function supplier(): User
@@ -166,10 +208,10 @@ class EncartaWebhookTest extends TestCase
      */
     private function signedHeaders(string $body): array
     {
-        $secret = (string) config('datahome.fulfillment.providers.encarta.webhook_secret', 'direct');
+        $secret = (string) config('datahome.fulfillment.providers.encarta.webhook_secret');
 
         return [
-            'HTTP_X_WEBHOOK_SIGNATURE' => 'sha256='.hash_hmac('sha256', $body, $secret),
+            'HTTP_X_PRISTARX_SIGNATURE' => hash_hmac('sha256', $body, $secret),
             'CONTENT_TYPE' => 'application/json',
         ];
     }

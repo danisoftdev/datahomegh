@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Services\Fulfillment\EncartaFulfillmentClient;
 use App\Services\Fulfillment\GeonetFulfillmentClient;
 use App\Services\Fulfillment\IgetFulfillmentClient;
-use App\Support\EncartaMtnNetwork;
 use App\Support\FulfillmentProviderType;
 use App\Support\GeonetMtnNetworkKey;
 use App\Support\IgetTelecelBundleType;
@@ -59,7 +58,7 @@ final class DataPackageFulfillmentService
         }
 
         $productCode = $this->resolveProductCode($order, $bundle, $profile);
-        if ($productCode === '') {
+        if ($productCode === '' && $profile->provider_type !== FulfillmentProviderType::ENCARTA) {
             $msg = $this->missingProductCodeMessage($profile);
             $this->recordDispatchError($order->id, $msg);
 
@@ -157,11 +156,6 @@ final class DataPackageFulfillmentService
             return GeonetMtnNetworkKey::resolve();
         }
 
-        if ($profile->provider_type === FulfillmentProviderType::ENCARTA
-            && EncartaMtnNetwork::isMtnNetwork((string) $order->network)) {
-            return EncartaMtnNetwork::resolve();
-        }
-
         if ($profile->provider_type === FulfillmentProviderType::IGET
             && IgetTelecelBundleType::isTelecelNetwork((string) $order->network)) {
             $resolved = IgetTelecelBundleType::resolve();
@@ -189,7 +183,7 @@ final class DataPackageFulfillmentService
     {
         return match ($profile->provider_type) {
             FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
-            FulfillmentProviderType::ENCARTA => __('Encarta MTN networkKey is not configured. Set FULFILLMENT_ENCARTA_MTN_NETWORK_KEY in .env (default YELLO).'),
+            FulfillmentProviderType::ENCARTA => __('Encarta bundle_id is missing. Set Provider bundle code on the package (ID from Encarta GET /bundles) or ensure size label matches catalogue capacity (e.g. 2GB).'),
             FulfillmentProviderType::IGET => __('iGet Telecel bundleType is not configured. Set FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE in .env (default Telecel-5959).'),
             default => __('No provider product code configured for this order.'),
         };

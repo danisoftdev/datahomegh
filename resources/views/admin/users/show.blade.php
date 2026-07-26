@@ -208,7 +208,7 @@
         <h3 class="mb-4 font-semibold text-white">{{ __('Wallet ledger') }}</h3>
         {{ $ledger->links() }}
         <div class="overflow-x-auto">
-            <table class="mt-2 w-full min-w-[48rem] text-left text-sm text-slate-300">
+            <table class="mt-2 w-full min-w-3xl text-left text-sm text-slate-300">
                 <thead class="text-xs uppercase text-slate-500">
                     <tr>
                         <th class="py-2 pr-3">{{ __('Transaction ID') }}</th>
