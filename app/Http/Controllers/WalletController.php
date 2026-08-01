@@ -156,10 +156,8 @@ class WalletController extends Controller
             }
         }
 
-        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
-
         try {
-            $ledger = $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
+            $ledger = $this->applyWalletTopupFromPaystack($userId, $reference, $data);
         } catch (Throwable $e) {
             Log::error('Wallet topup callback failed', ['reference' => $reference, 'exception' => $e]);
 
@@ -207,7 +205,6 @@ class WalletController extends Controller
 
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
         $purpose = PaystackPaymentPurpose::resolve($txn, $data);
-        $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
 
         try {
             if ($purpose === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
@@ -217,6 +214,7 @@ class WalletController extends Controller
 
                     return response()->json([], 200);
                 }
+                $amountGhs = PaystackVerifyAmount::ghsFromVerifyData($data);
                 $this->agentShopRegistrationPaymentService->completeSuccessfulPayment($userId, $reference, $amountGhs, $data);
             } elseif ($purpose === PaystackPaymentPurpose::AGENT_SHOP_ORDER) {
                 $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
@@ -225,7 +223,7 @@ class WalletController extends Controller
 
                     return response()->json([], 200);
                 }
-                $this->agentShopCheckoutService->completePaystackCheckout($userId, $reference, $amountGhs, $data);
+                $this->agentShopCheckoutService->completePaystackCheckout($userId, $reference, $data);
             } elseif ($purpose === PaystackPaymentPurpose::WALLET_TOPUP) {
                 $userId = (int) ($txn?->user_id ?? PaystackChargeMetadata::fromChargeData($data)['user_id'] ?? 0);
                 if ($userId <= 0) {
@@ -233,7 +231,7 @@ class WalletController extends Controller
 
                     return response()->json([], 200);
                 }
-                $this->applyWalletTopupFromPaystack($userId, $reference, $amountGhs, $data);
+                $this->applyWalletTopupFromPaystack($userId, $reference, $data);
             } else {
                 Log::warning('paystack_webhook_unknown_purpose', ['reference' => $reference, 'purpose' => $purpose]);
             }
@@ -301,7 +299,7 @@ class WalletController extends Controller
      *
      * @param  array<string, mixed>  $verifyData
      */
-    private function applyWalletTopupFromPaystack(int $userId, string $reference, string $amountGhs, array $verifyData): ?WalletLedger
+    private function applyWalletTopupFromPaystack(int $userId, string $reference, array $verifyData): ?WalletLedger
     {
         $txn = PaystackTransaction::query()->where('reference', $reference)->first();
         if (PaystackPaymentPurpose::resolve($txn, $verifyData) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
@@ -318,13 +316,16 @@ class WalletController extends Controller
             Log::warning('paystack_wallet_credit_refused_agent_linked_buyer', [
                 'user_id' => $userId,
                 'reference' => $reference,
-                'amount_ghs' => $amountGhs,
             ]);
 
             return null;
         }
 
-        return DB::transaction(function () use ($userId, $reference, $amountGhs, $verifyData): ?WalletLedger {
+        $creditGhs = $txn !== null
+            ? PaystackVerifyAmount::creditGhsFromInitializedPayment($txn->amount, $verifyData)
+            : PaystackVerifyAmount::ghsFromVerifyData($verifyData);
+
+        return DB::transaction(function () use ($userId, $reference, $creditGhs, $verifyData): ?WalletLedger {
             $txn = PaystackTransaction::query()->where('reference', $reference)->lockForUpdate()->first();
 
             if ($txn !== null && PaystackPaymentPurpose::storedKind($txn) === PaystackPaymentPurpose::AGENT_SHOP_REGISTRATION) {
@@ -366,13 +367,13 @@ class WalletController extends Controller
                 return $existingLedger;
             }
 
-            $ledger = $this->walletService->credit($userId, $amountGhs, 'PAYSTACK', $reference, null);
+            $ledger = $this->walletService->credit($userId, $creditGhs, 'PAYSTACK', $reference, null);
 
             PaystackTransaction::query()->updateOrCreate(
                 ['reference' => $reference],
                 [
                     'user_id' => $userId,
-                    'amount' => $amountGhs,
+                    'amount' => $creditGhs,
                     'status' => 'success',
                     'channel' => isset($verifyData['channel']) ? (string) $verifyData['channel'] : null,
                     'paid_at' => isset($verifyData['paid_at']) ? Carbon::parse($verifyData['paid_at']) : now(),

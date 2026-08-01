@@ -328,6 +328,42 @@ function api_paystack_amount_ghs(array $verifyData): string
     return number_format($pesewas / 100, 2, '.', '');
 }
 
+function api_paystack_initialized_payment_matches(int $expectedPesewas, int $paidPesewas): bool
+{
+    if ($paidPesewas <= 0 || $expectedPesewas <= 0) {
+        return false;
+    }
+
+    $minAccepted = max(0, $expectedPesewas - 10);
+    $maxAccepted = (int) ceil($expectedPesewas * 1.25) + 100;
+
+    return $paidPesewas >= $minAccepted && $paidPesewas <= $maxAccepted;
+}
+
+function api_paystack_credit_ghs_from_initialized(?string $initializedAmountGhs, array $verifyData): string
+{
+    if ($initializedAmountGhs === null || $initializedAmountGhs === '') {
+        throw new InvalidArgumentException('Initialized Paystack amount is missing.');
+    }
+
+    $expectedPesewas = (int) round(((float) $initializedAmountGhs) * 100);
+    $paidPesewas = (int) ($verifyData['amount'] ?? 0);
+
+    if ($expectedPesewas <= 0) {
+        throw new InvalidArgumentException('Initialized Paystack amount is invalid.');
+    }
+
+    if ($paidPesewas <= 0) {
+        throw new RuntimeException('Paystack verify response did not include an amount.');
+    }
+
+    if (! api_paystack_initialized_payment_matches($expectedPesewas, $paidPesewas)) {
+        throw new RuntimeException('Paystack payment does not match the expected amount.');
+    }
+
+    return number_format((float) $initializedAmountGhs, 2, '.', '');
+}
+
 /**
  * @return array<string, mixed>
  */

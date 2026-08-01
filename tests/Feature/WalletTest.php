@@ -158,6 +158,62 @@ class WalletTest extends TestCase
         $this->assertSame('50.00', (string) $buyer->wallet->fresh()->balance);
     }
 
+    public function test_paystack_webhook_credits_initialized_amount_not_paystack_surcharge(): void
+    {
+        config(['paystack.secret_key' => 'sk_test_secret']);
+
+        $buyerRole = Role::query()->where('slug', Role::SLUG_BUYER)->firstOrFail();
+        $buyer = User::factory()->create([
+            'role_id' => $buyerRole->id,
+            'status' => 'active',
+            'agent_id' => null,
+        ]);
+
+        Wallet::query()->create([
+            'user_id' => $buyer->id,
+            'balance' => '18.35',
+            'is_frozen' => false,
+        ]);
+
+        PaystackTransaction::query()->create([
+            'user_id' => $buyer->id,
+            'reference' => 'ref_topup_surcharge',
+            'amount' => '400.00',
+            'status' => 'pending',
+            'metadata' => ['kind' => PaystackPaymentPurpose::WALLET_TOPUP],
+        ]);
+
+        $payload = [
+            'event' => 'charge.success',
+            'data' => [
+                'reference' => 'ref_topup_surcharge',
+                'amount' => 40796,
+                'metadata' => [
+                    'user_id' => $buyer->id,
+                ],
+                'channel' => 'mobile_money',
+                'paid_at' => now()->toIso8601String(),
+            ],
+        ];
+
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+        $sig = hash_hmac('sha512', $raw, 'sk_test_secret');
+
+        $this->call('POST', route('wallet.paystack.webhook'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X-Paystack-Signature' => $sig,
+        ], $raw)->assertOk();
+
+        $this->assertSame('418.35', (string) $buyer->wallet->fresh()->balance);
+
+        $ledger = WalletLedger::query()
+            ->where('user_id', $buyer->id)
+            ->where('reference', 'ref_topup_surcharge')
+            ->firstOrFail();
+
+        $this->assertSame('400.00', (string) $ledger->amount);
+    }
+
     public function test_paystack_webhook_does_not_credit_agent_linked_buyer(): void
     {
         config(['paystack.secret_key' => 'sk_test_secret']);
