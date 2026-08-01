@@ -7,6 +7,7 @@ use App\Models\PaystackTransaction;
 use App\Models\User;
 use App\Support\AgentShopBuyerPolicy;
 use App\Support\PaystackPaymentPurpose;
+use App\Support\PaystackVerifyAmount;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -86,17 +87,18 @@ class AgentShopCheckoutService
     /**
      * @param  array<string, mixed>  $verifyData
      */
-    public function completePaystackCheckout(int $userId, string $reference, string $amountGhs, array $verifyData): void
+    public function completePaystackCheckout(int $userId, string $reference, array $verifyData): void
     {
         $txn = PaystackTransaction::query()->where('reference', $reference)->firstOrFail();
         $metadata = is_array($txn->metadata) ? $txn->metadata : [];
+        $orderTotalGhs = PaystackVerifyAmount::creditGhsFromInitializedPayment($txn->amount, $verifyData);
 
         if ($txn->status === 'success' && ($metadata['orders_created'] ?? false) === true) {
             return;
         }
 
         if (Order::query()->where('paystack_reference', $reference)->exists()) {
-            $this->markCheckoutTransactionSuccessful($txn, $amountGhs, $verifyData, $metadata);
+            $this->markCheckoutTransactionSuccessful($txn, $orderTotalGhs, $verifyData, $metadata);
 
             return;
         }
@@ -116,7 +118,7 @@ class AgentShopCheckoutService
             'skip_wallet_debit' => true,
         ]);
 
-        $this->markCheckoutTransactionSuccessful($txn->fresh(), $amountGhs, $verifyData, $metadata);
+        $this->markCheckoutTransactionSuccessful($txn->fresh(), $orderTotalGhs, $verifyData, $metadata);
     }
 
     /**

@@ -104,7 +104,8 @@ final class WalletApi
             Response::error('Paystack top-up cannot be applied for buyers linked to an agent', 422);
         }
 
-        $amountGhs = api_paystack_amount_ghs($data);
+        $initializedGhs = $txn !== false ? (string) ($txn['amount'] ?? '') : '';
+        $amountGhs = api_paystack_credit_ghs_from_initialized($initializedGhs !== '' ? $initializedGhs : null, $data);
 
         try {
             $pdo->beginTransaction();

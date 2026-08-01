@@ -12,6 +12,25 @@ class PaystackVerifyAmountTest extends TestCase
     public function test_registration_fee_matches(int $expectedPesewas, int $paidPesewas, bool $matches): void
     {
         $this->assertSame($matches, PaystackVerifyAmount::registrationFeeMatches($expectedPesewas, $paidPesewas));
+        $this->assertSame($matches, PaystackVerifyAmount::initializedPaymentMatches($expectedPesewas, $paidPesewas));
+    }
+
+    public function test_wallet_credit_uses_initialized_amount_when_paystack_includes_surcharge(): void
+    {
+        $credit = PaystackVerifyAmount::creditGhsFromInitializedPayment('400.00', [
+            'amount' => 40796,
+        ]);
+
+        $this->assertSame('400.00', $credit);
+    }
+
+    public function test_wallet_credit_rejects_payment_below_initialized_amount(): void
+    {
+        $this->expectException(\RuntimeException::class);
+
+        PaystackVerifyAmount::creditGhsFromInitializedPayment('400.00', [
+            'amount' => 30000,
+        ]);
     }
 
     /**

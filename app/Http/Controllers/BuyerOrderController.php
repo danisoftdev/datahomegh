@@ -243,10 +243,8 @@ class BuyerOrderController extends Controller
             return redirect()->route('buyer.orders.create')->withErrors(['paystack' => __('Payment was not successful.')]);
         }
 
-        $amountGhs = \App\Support\PaystackVerifyAmount::ghsFromVerifyData($verify);
-
         try {
-            $this->agentShopCheckoutService->completePaystackCheckout((int) $user->id, $reference, $amountGhs, $verify);
+            $this->agentShopCheckoutService->completePaystackCheckout((int) $user->id, $reference, $verify);
         } catch (\Throwable $e) {
             return redirect()->route('buyer.orders.create')->withErrors(['paystack' => __('Could not place your order after payment. Contact support with reference :ref.', ['ref' => $reference])]);
         }
