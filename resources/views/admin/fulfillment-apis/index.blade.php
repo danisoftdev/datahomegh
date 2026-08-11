@@ -32,6 +32,12 @@
                 'webhook' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
             ]) }}
         </p>
+        <p class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100 lg:col-span-3">
+            <strong class="text-emerald-200">{{ __('Skanka5') }}</strong><br>
+            {{ __('Base: :api. Auth: x-api-key. POST /orders (network_id, msisdn, volume_mb). Poll GET /orders/{reference}. Bulk webhooks (5+ lines) optional.', [
+                'api' => config('datahome.fulfillment.providers.skanka5.default_base_url'),
+            ]) }}
+        </p>
     </div>
 
     <div class="mb-8 max-w-xl rounded-xl border border-white/10 bg-[#16213E]/80 p-6">
@@ -54,6 +60,7 @@
                 <select name="network" id="network" required class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white">
                     <option value="MTN" @selected(old('network') === 'MTN')>MTN</option>
                     <option value="Telecel" @selected(old('network') === 'Telecel')>Telecel</option>
+                    <option value="AirtelTigo" @selected(old('network') === 'AirtelTigo')>AirtelTigo</option>
                 </select>
                 @error('network')
                     <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
@@ -115,18 +122,30 @@
 
             function sync() {
                 const p = defaults[providerEl.value] || defaults.geonet;
-                networkEl.value = p.network;
+                const allowed = p.networks || [p.network];
+                if (!allowed.includes(networkEl.value)) {
+                    networkEl.value = allowed[0];
+                }
                 networkEl.querySelectorAll('option').forEach((opt) => {
-                    opt.hidden = opt.value !== p.network;
-                    opt.disabled = opt.value !== p.network;
+                    const ok = allowed.includes(opt.value);
+                    opt.hidden = !ok;
+                    opt.disabled = !ok;
                 });
                 if (!baseUrlEl.dataset.touched) {
                     baseUrlEl.value = p.baseUrl;
                 }
                 baseHintEl.textContent = p.baseHint.replace('{base}', baseUrlEl.value || p.baseUrl);
                 keyLabelEl.textContent = p.keyLabel;
-                codeWrap.classList.add('hidden');
-                codeEl.removeAttribute('name');
+                if (p.showNetworkIdField) {
+                    codeWrap.classList.remove('hidden');
+                    codeEl.setAttribute('name', 'default_provider_bundle_type');
+                    codeLabelEl.textContent = p.networkIdLabel || codeLabelEl.textContent;
+                    codeHintEl.textContent = p.networkIdHint || '';
+                } else {
+                    codeWrap.classList.add('hidden');
+                    codeEl.removeAttribute('name');
+                    codeHintEl.textContent = '';
+                }
                 providerNote.textContent = p.autoKeyNote || '';
                 providerNote.classList.remove('hidden');
             }
@@ -155,6 +174,8 @@
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN API key:') }} <span class="font-mono text-slate-300">{{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span></p>
                         @elseif ($profile->isEncarta())
                             <p class="mt-1 text-xs text-slate-500">{{ __('MTN Encarta:') }} <span class="font-mono text-slate-300">{{ config('datahome.fulfillment.providers.encarta.place_path', '/purchase') }}</span> · {{ __('bundle_id from package or GET /bundles') }}</p>
+                        @elseif ($profile->isSkanka5())
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Skanka5:') }} <span class="font-mono text-slate-300">POST /orders</span> · {{ __('network_id + volume_mb (e.g. 2GB → 2000)') }}</p>
                         @elseif ($profile->isIget())
                             <p class="mt-1 text-xs text-slate-500">{{ __('Telecel bundleType:') }} <span class="font-mono text-slate-300">{{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span></p>
                         @endif

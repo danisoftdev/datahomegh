@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Fulfillment\EncartaFulfillmentClient;
 use App\Services\Fulfillment\GeonetFulfillmentClient;
 use App\Services\Fulfillment\IgetFulfillmentClient;
+use App\Services\Fulfillment\Skanka5FulfillmentClient;
 use App\Support\FulfillmentProviderType;
 use App\Support\GeonetMtnNetworkKey;
 use App\Support\IgetTelecelBundleType;
@@ -20,6 +21,7 @@ final class DataPackageFulfillmentService
         private readonly IgetFulfillmentClient $igetClient,
         private readonly GeonetFulfillmentClient $geonetClient,
         private readonly EncartaFulfillmentClient $encartaClient,
+        private readonly Skanka5FulfillmentClient $skanka5Client,
     ) {}
 
     /**
@@ -58,7 +60,7 @@ final class DataPackageFulfillmentService
         }
 
         $productCode = $this->resolveProductCode($order, $bundle, $profile);
-        if ($productCode === '' && $profile->provider_type !== FulfillmentProviderType::ENCARTA) {
+        if ($productCode === '' && ! in_array($profile->provider_type, [FulfillmentProviderType::ENCARTA, FulfillmentProviderType::SKANKA5], true)) {
             $msg = $this->missingProductCodeMessage($profile);
             $this->recordDispatchError($order->id, $msg);
 
@@ -69,6 +71,7 @@ final class DataPackageFulfillmentService
             FulfillmentProviderType::IGET => $this->igetClient->place($order, $bundle, $profile, $productCode),
             FulfillmentProviderType::GEONET => $this->geonetClient->place($order, $bundle, $profile, $productCode),
             FulfillmentProviderType::ENCARTA => $this->encartaClient->place($order, $bundle, $profile, $productCode),
+            FulfillmentProviderType::SKANKA5 => $this->skanka5Client->place($order, $bundle, $profile, $productCode),
             default => ['ok' => false, 'message' => __('Unknown API provider type.')],
         };
 
@@ -107,6 +110,7 @@ final class DataPackageFulfillmentService
             FulfillmentProviderType::IGET => $this->igetClient->refreshStatus($order, $profile, $ref),
             FulfillmentProviderType::GEONET => $this->geonetClient->refreshStatus($order, $profile, $ref),
             FulfillmentProviderType::ENCARTA => $this->encartaClient->refreshStatus($order, $profile, $ref),
+            FulfillmentProviderType::SKANKA5 => $this->skanka5Client->refreshStatus($order, $profile, $ref),
             default => ['ok' => false, 'message' => __('Unknown API provider type.')],
         };
 
@@ -184,6 +188,7 @@ final class DataPackageFulfillmentService
         return match ($profile->provider_type) {
             FulfillmentProviderType::GEONET => __('Geonettech MTN network_key is not configured. Set FULFILLMENT_GEONET_MTN_NETWORK_KEY in .env (default YELLO).'),
             FulfillmentProviderType::ENCARTA => __('Encarta bundle_id is missing. Set Provider bundle code on the package (ID from Encarta GET /bundles) or ensure size label matches catalogue capacity (e.g. 2GB).'),
+            FulfillmentProviderType::SKANKA5 => __('Skanka5 network_id or volume_mb is missing. Set network ID on the API profile or .env, and match size label (e.g. 2GB → 2000 MB).'),
             FulfillmentProviderType::IGET => __('iGet Telecel bundleType is not configured. Set FULFILLMENT_IGET_TELECEL_BUNDLE_TYPE in .env (default Telecel-5959).'),
             default => __('No provider product code configured for this order.'),
         };

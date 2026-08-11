@@ -61,6 +61,11 @@ class FulfillmentApiProfile extends Model
         return $this->provider_type === FulfillmentProviderType::ENCARTA;
     }
 
+    public function isSkanka5(): bool
+    {
+        return $this->provider_type === FulfillmentProviderType::SKANKA5;
+    }
+
     public static function defaultBaseUrl(string $providerType): string
     {
         return (string) config('datahome.fulfillment.providers.'.$providerType.'.default_base_url', '');
@@ -126,6 +131,30 @@ class FulfillmentApiProfile extends Model
             '/afa-status',
             '/balance',
             '/bundles',
+        ] as $suffix) {
+            $len = strlen($suffix);
+            if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {
+                $base = rtrim(substr($base, 0, -$len), '/');
+            }
+        }
+
+        return $base;
+    }
+
+    /**
+     * Skanka5 base (https://agent.skanka5.com/api/v1). Strips accidental endpoint suffixes.
+     */
+    public static function normalizeSkanka5BaseUrl(string $baseUrl): string
+    {
+        $base = rtrim(trim($baseUrl), '/');
+
+        foreach ([
+            '/fetch-other-network-transaction',
+            '/fetch-transactions',
+            '/fetch-data-packages',
+            '/fetch-networks',
+            '/orders/bulk',
+            '/orders',
         ] as $suffix) {
             $len = strlen($suffix);
             if ($len > 0 && strlen($base) >= $len && strcasecmp(substr($base, -$len), $suffix) === 0) {

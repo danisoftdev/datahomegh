@@ -132,6 +132,37 @@ class DataPackageFulfillmentTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function skanka5Profile(User $supplier, array $overrides = []): FulfillmentApiProfile
+    {
+        return FulfillmentApiProfile::query()->create(array_merge([
+            'supplier_user_id' => $supplier->id,
+            'network' => 'MTN',
+            'provider_type' => FulfillmentProviderType::SKANKA5,
+            'name' => 'Skanka5 MTN',
+            'base_url' => 'https://provider.test/api/v1',
+            'api_key' => 'skanka5-key',
+            'default_provider_bundle_type' => '3',
+            'is_active' => true,
+        ], $overrides));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function skanka5PlaceSuccessResponse(string $reference = 'SK5-REF-001'): array
+    {
+        return [
+            'status' => 'accepted',
+            'reference' => $reference,
+            'orders' => [
+                ['order_code' => $reference, 'status' => 'pending'],
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function geonetPlaceSuccessResponse(): array
@@ -883,5 +914,111 @@ class DataPackageFulfillmentTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('completed', (string) $order->fresh()->provider_status);
+    }
+
+    #[DataProvider('normalizeSkanka5BaseUrlProvider')]
+    public function test_normalize_skanka5_base_url_strips_endpoint_suffixes(string $input, string $expected): void
+    {
+        $this->assertSame($expected, FulfillmentApiProfile::normalizeSkanka5BaseUrl($input));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function normalizeSkanka5BaseUrlProvider(): array
+    {
+        return [
+            'api root' => ['https://agent.skanka5.com/api/v1', 'https://agent.skanka5.com/api/v1'],
+            'orders path' => ['https://agent.skanka5.com/api/v1/orders', 'https://agent.skanka5.com/api/v1'],
+            'fetch networks path' => ['https://agent.skanka5.com/api/v1/fetch-networks', 'https://agent.skanka5.com/api/v1'],
+        ];
+    }
+
+    public function test_mtn_data_dispatches_to_skanka5_orders_with_network_id_and_volume_mb(): void
+    {
+        $supplier = $this->supplier();
+        $this->skanka5Profile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 2GB',
+            'size_label' => '2GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/v1/orders' => Http::response($this->skanka5PlaceSuccessResponse(), 202),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ])->assertRedirect(route('buyer.orders.index'));
+
+        $order = Order::query()->latest('id')->firstOrFail();
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://provider.test/api/v1/orders'
+                && $request->hasHeader('x-api-key', 'skanka5-key')
+                && $request['network_id'] === 3
+                && $request['msisdn'] === '0244123456'
+                && $request['volume_mb'] === 2000;
+        });
+
+        $this->assertSame('SK5-REF-001', $order->provider_order_reference);
+    }
+
+    public function test_admin_can_refresh_skanka5_provider_status(): void
+    {
+        $supplier = $this->supplier();
+        $this->skanka5Profile($supplier);
+
+        $bundle = BundlePackage::query()->create([
+            'agent_id' => null,
+            'network' => 'MTN',
+            'package_kind' => 'data',
+            'name' => 'MTN 2GB',
+            'size_label' => '2GB',
+            'internal_cost' => '5.00',
+            'stock_count' => 10,
+            'is_available' => true,
+        ]);
+
+        Http::fake([
+            'https://provider.test/api/v1/orders' => Http::response($this->skanka5PlaceSuccessResponse('SK5-POLL-001'), 202),
+        ]);
+
+        $buyer = $this->buyerWithWallet('100.00');
+
+        $this->actingAs($buyer)->post(route('buyer.orders.store'), [
+            'network' => 'MTN',
+            'phone_number' => '0244123456',
+            'bundle_package_id' => $bundle->id,
+            'confirm' => true,
+        ]);
+
+        $order = Order::query()->latest('id')->firstOrFail();
+        $this->assertSame('SK5-POLL-001', $order->provider_order_reference);
+
+        Http::fake([
+            'https://provider.test/api/v1/orders/SK5-POLL-001' => Http::response([
+                'orders' => [
+                    ['order_code' => 'SK5-POLL-001', 'status' => 'processed'],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($supplier)->post(route('admin.orders.refresh-provider-status', $order))
+            ->assertRedirect();
+
+        $this->assertSame('processed', (string) $order->fresh()->provider_status);
     }
 }

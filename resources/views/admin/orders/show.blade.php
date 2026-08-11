@@ -34,11 +34,23 @@
                             @php($mtnApi = $order->fulfillmentApiProfile ?? \App\Models\FulfillmentApiProfile::activeForNetwork('MTN'))
                             @if ($mtnApi?->isEncarta())
                                 <span class="block text-xs text-slate-500">{{ __('Encarta MTN purchase') }} · {{ __('bundle_id from provider code or size label (e.g. 2GB)') }}</span>
+                            @elseif ($mtnApi?->isSkanka5())
+                                <span class="block text-xs text-slate-500">{{ __('Skanka5') }} · {{ __('network_id + volume_mb from size label (e.g. 2GB → 2000)') }}</span>
                             @elseif ($mtnApi?->isGeonet())
                                 <span class="block text-xs text-slate-500">{{ __('Geonettech') }}: {{ __('automatic (:key)', ['key' => \App\Support\GeonetMtnNetworkKey::resolve()]) }}</span>
                             @endif
                         @elseif ($order->network === 'Telecel')
-                            <span class="block text-xs text-slate-500">{{ __('iGet') }}: {{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span>
+                            @php($telecelApi = $order->fulfillmentApiProfile ?? \App\Models\FulfillmentApiProfile::activeForNetwork('Telecel'))
+                            @if ($telecelApi?->isSkanka5())
+                                <span class="block text-xs text-slate-500">{{ __('Skanka5') }} · {{ __('network_id + volume_mb from size label') }}</span>
+                            @else
+                                <span class="block text-xs text-slate-500">{{ __('iGet') }}: {{ __('automatic (:type)', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}</span>
+                            @endif
+                        @elseif ($order->network === 'AirtelTigo')
+                            @php($atApi = $order->fulfillmentApiProfile ?? \App\Models\FulfillmentApiProfile::activeForNetwork('AirtelTigo'))
+                            @if ($atApi?->isSkanka5())
+                                <span class="block text-xs text-slate-500">{{ __('Skanka5') }} · {{ __('network_id + volume_mb from size label') }}</span>
+                            @endif
                         @elseif ($order->bundlePackage->provider_bundle_type)
                             <span class="block text-xs text-slate-500">{{ __('Provider code') }}: {{ $order->bundlePackage->provider_bundle_type }}</span>
                         @endif

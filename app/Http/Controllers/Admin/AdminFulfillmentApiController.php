@@ -132,6 +132,7 @@ class AdminFulfillmentApiController extends Controller
         $normalized = match ($providerType) {
             FulfillmentProviderType::GEONET => FulfillmentApiProfile::normalizeGeonetBaseUrl($baseUrl),
             FulfillmentProviderType::ENCARTA => FulfillmentApiProfile::normalizeEncartaBaseUrl($baseUrl),
+            FulfillmentProviderType::SKANKA5 => FulfillmentApiProfile::normalizeSkanka5BaseUrl($baseUrl),
             default => FulfillmentApiProfile::normalizeBaseUrl($baseUrl),
         };
 
@@ -196,30 +197,47 @@ class AdminFulfillmentApiController extends Controller
         return [
             'iget' => [
                 'network' => 'Telecel',
+                'networks' => ['Telecel'],
                 'baseUrl' => config('datahome.fulfillment.providers.iget.default_base_url'),
                 'baseHint' => __('iGet API host only (not console.igetghana.com). Calls: {base}/api/developer/orders/place'),
                 'autoKeyNote' => __('Telecel bundleType :type is applied automatically for all Telecel data orders.', [
                     'type' => IgetTelecelBundleType::resolve(),
                 ]),
                 'keyLabel' => __('iGet API key (X-API-Key)'),
+                'showNetworkIdField' => false,
             ],
             'geonet' => [
                 'network' => 'MTN',
+                'networks' => ['MTN'],
                 'baseUrl' => config('datahome.fulfillment.providers.geonet.default_base_url'),
                 'baseHint' => __('Geonettech API base. Calls: {base}/v1/place-order'),
                 'autoKeyNote' => __('MTN uses Geonettech network_key :key automatically.', [
                     'key' => GeonetMtnNetworkKey::resolve(),
                 ]),
                 'keyLabel' => __('Geonettech Bearer token'),
+                'showNetworkIdField' => false,
             ],
             'encarta' => [
                 'network' => 'MTN',
+                'networks' => ['MTN'],
                 'baseUrl' => config('datahome.fulfillment.providers.encarta.default_base_url'),
                 'baseHint' => __('Encarta API base. MTN data uses POST /purchase with bundle_id from GET /bundles.'),
                 'autoKeyNote' => __('MTN Encarta: POST /purchase (bundle_id, recipient, idempotency_key, webhook_url). Set FULFILLMENT_ENCARTA_WEBHOOK_SECRET in .env. Status via signed webhooks to :url.', [
                     'url' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
                 ]),
                 'keyLabel' => __('Encarta X-API-Key'),
+                'showNetworkIdField' => false,
+            ],
+            'skanka5' => [
+                'network' => 'MTN',
+                'networks' => ['MTN', 'Telecel', 'AirtelTigo'],
+                'baseUrl' => config('datahome.fulfillment.providers.skanka5.default_base_url'),
+                'baseHint' => __('Skanka5 API base. POST /orders (single line) + poll GET /orders/{reference}.'),
+                'autoKeyNote' => __('Skanka5: network_id from GET /fetch-networks (or optional field below). volume_mb from bundle size (2GB → 2000). Bulk webhooks (5+ lines) optional — set FULFILLMENT_SKANKA5_WEBHOOK_SECRET in .env.'),
+                'keyLabel' => __('Skanka5 x-api-key'),
+                'showNetworkIdField' => true,
+                'networkIdLabel' => __('Skanka5 network_id (optional)'),
+                'networkIdHint' => __('Override network ID from Skanka5 GET /fetch-networks. Leave blank to auto-match by network name.'),
             ],
         ];
     }
