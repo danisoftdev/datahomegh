@@ -34,6 +34,8 @@
                         {{ __('Geonettech base, e.g. :api', ['api' => config('datahome.fulfillment.providers.geonet.default_base_url')]) }}
                     @elseif ($profile->isEncarta())
                         {{ __('Encarta base, e.g. :api', ['api' => config('datahome.fulfillment.providers.encarta.default_base_url')]) }}
+                    @elseif ($profile->isSkanka5())
+                        {{ __('Skanka5 base, e.g. :api', ['api' => config('datahome.fulfillment.providers.skanka5.default_base_url')]) }}
                     @else
                         {{ __('iGet API host only — not console.igetghana.com. Example: :api', ['api' => config('datahome.fulfillment.providers.iget.default_base_url')]) }}
                     @endif
@@ -53,6 +55,18 @@
                         'url' => \App\Services\Fulfillment\EncartaWebhookService::webhookUrl(),
                     ]) }}
                 </p>
+            @elseif ($profile->isSkanka5())
+                <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+                    {{ __('Skanka5 uses POST /orders (network_id, msisdn, volume_mb). Single orders: poll GET /orders/{reference}. Optional network_id override below.') }}
+                </p>
+                <div>
+                    <label class="mb-1 block text-sm text-slate-400">{{ __('Skanka5 network_id (optional)') }}</label>
+                    <input type="text" name="default_provider_bundle_type" value="{{ old('default_provider_bundle_type', $profile->default_provider_bundle_type) }}" maxlength="120"
+                        class="w-full rounded-lg border border-white/10 bg-[#1A1A2E] px-3 py-2 text-white" />
+                    @error('default_provider_bundle_type')
+                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
             @else
                 <p class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
                     {{ __('Telecel iGet bundleType (:type) is applied automatically for all Telecel data orders.', ['type' => \App\Support\IgetTelecelBundleType::resolve()]) }}

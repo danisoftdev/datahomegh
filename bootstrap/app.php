@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'wallet/paystack/webhook',
             'webhooks/encarta',
+            'webhooks/skanka5',
             'register/agent-fee/callback',
             'wallet/topup/callback',
         ]);
